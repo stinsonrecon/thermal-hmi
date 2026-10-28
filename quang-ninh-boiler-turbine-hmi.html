@@ -1,0 +1,863 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HMI Quảng Ninh</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Sơ đồ HMI lò hơi và tua bin NMNĐ Quảng Ninh 1 và 2 (4 × 300 MW cùng thiết kế), vẽ theo báo cáo khảo sát 4.1.3, 4.1.4,
+   bản vẽ áp lực Alstom P0200, bố trí chung P0001 và sơ đồ nhiệt chi tiết tổ máy 300 MW.
+   Token màu dòng chảy và thiết bị giống pms-frontend thermal-efficiency/diagrams/hmi-mimic.css. */
+:root {
+  --bg: #F4F6F9; --surface: #FFFFFF; --subtle: #EDF1F5; --fg: #0A1B36; --fg2: #4A5A73; --fg3: #8896A6;
+  --border: #D6DEE8; --blue: #005BAA; --blue-tint: #E6F0FA; --btn-fg: #FFFFFF; --navy: #002F6C;
+  --warn: #B07005; --warn-tint: #FDF3E1; --ok: #1E8F4E;
+  --canvas: #F7F9FB; --equip: #E3E8EF; --equip-2: #CDD5E0; --equip-stroke: #8896A6; --label-bg: rgba(255,255,255,.95);
+  --flow-gas-hot: #C1121F; --flow-gas: #E4572E; --flow-gas-cool: #F2A541; --flow-steam: #005BAA; --flow-rh: #0B78C9;
+  --flow-water: #4FA3E3; --flow-air-cold: #1F3A5F; --flow-air-hot: #E0A100; --flow-cw: #0B78C9; --flow-coal: #4A5A73; --flame: #F2A541;
+  --font: "Be Vietnam Pro", "Segoe UI", Arial, sans-serif; --mono: "JetBrains Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0B1424; --surface: #111D33; --subtle: #16253F; --fg: #E6ECF5; --fg2: #A9B6C8; --fg3: #7A8AA1;
+  --border: #24344F; --blue: #4FA3E3; --blue-tint: #13304F; --btn-fg: #0A1B36; --navy: #001A3D;
+  --warn: #F0B44C; --warn-tint: #3A2B0E; --ok: #4CC07D;
+  --canvas: #0E1930; --equip: #1B2A44; --equip-2: #24375A; --equip-stroke: #5E6E86; --label-bg: rgba(17,29,51,.95);
+  --flow-steam: #4FA3E3; --flow-rh: #7BBBEB; --flow-water: #7BBBEB; --flow-air-cold: #7C9CC8; --flow-air-hot: #F5B922; --flow-cw: #4FA3E3; --flow-coal: #A9B6C8;
+  color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #0B1424; --surface: #111D33; --subtle: #16253F; --fg: #E6ECF5; --fg2: #A9B6C8; --fg3: #7A8AA1;
+  --border: #24344F; --blue: #4FA3E3; --blue-tint: #13304F; --btn-fg: #0A1B36; --navy: #001A3D;
+  --warn: #F0B44C; --warn-tint: #3A2B0E; --ok: #4CC07D;
+  --canvas: #0E1930; --equip: #1B2A44; --equip-2: #24375A; --equip-stroke: #5E6E86; --label-bg: rgba(17,29,51,.95);
+  --flow-steam: #4FA3E3; --flow-rh: #7BBBEB; --flow-water: #7BBBEB; --flow-air-cold: #7C9CC8; --flow-air-hot: #F5B922; --flow-cw: #4FA3E3; --flow-coal: #A9B6C8;
+  color-scheme: dark;
+}
+/* ISA-101: quá trình về màu trung tính, màu chỉ dành cho trạng thái bất thường */
+body.isa { --flow-gas-hot: var(--fg3); --flow-gas: var(--fg3); --flow-gas-cool: var(--fg3); --flow-steam: var(--fg2); --flow-rh: var(--fg2);
+  --flow-water: var(--fg3); --flow-air-cold: var(--fg3); --flow-air-hot: var(--fg3); --flow-cw: var(--fg3); --flow-coal: var(--fg3); --flame: var(--fg3); }
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; line-height: 1.5; margin: 0; }
+/* Sơ đồ chiếm toàn bộ khung nhìn; bảng thông tin nằm trong drawer */
+.wrap { height: 100vh; height: 100dvh; display: flex; flex-direction: column; gap: 10px; padding: 12px 16px; }
+.wrap > * { flex: none; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+h1 { font-size: 15px; line-height: 1.3; margin: 0 12px 0 0; white-space: nowrap; color: var(--fg); }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: none; padding: 8px 12px; font-size: 13px; font-weight: 600; color: var(--fg2); cursor: pointer; min-height: 36px; }
+.seg button[aria-pressed="true"] { background: var(--blue); color: var(--btn-fg); }
+.toggle { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); cursor: pointer; font-size: 13px; font-weight: 600; min-height: 36px; }
+.toggle[aria-pressed="true"] { border-color: var(--blue); color: var(--blue); background: var(--blue-tint); }
+
+
+.tabs { display: flex; gap: 4px 8px; align-items: center; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+.tablist { display: flex; gap: 4px; }
+.tabs-end { margin-left: auto; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 4px 0; }
+.tabs-end .seg button { padding: 6px 10px; min-height: 32px; }
+.tabs-end .toggle { padding: 5px 10px; min-height: 32px; }
+.toggle[aria-expanded="true"] { border-color: var(--blue); color: var(--blue); background: var(--blue-tint); }
+.tab { border: 0; background: none; padding: 10px 16px; font-weight: 600; font-size: 14px; color: var(--fg2); border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap; }
+.tab[aria-selected="true"] { color: var(--blue); border-bottom-color: var(--blue); }
+
+.wrap > .screen { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 2px 8px rgba(10,27,54,.06), 0 8px 24px rgba(10,27,54,.04); }
+.mimic { flex: 1 1 auto; min-height: 0; padding: 8px; overflow: auto; }
+.mimic svg { display: block; width: 100%; height: 100%; min-width: 900px; min-height: 520px; background: var(--canvas); border-radius: 6px; touch-action: none; user-select: none; }
+.mimic svg[data-zoomable="true"] { cursor: grab; }
+.mimic svg[data-panning="true"] { cursor: grabbing; }
+.foot-row { flex: none; display: flex; align-items: center; gap: 12px; padding-right: 12px; }
+.zoombar { flex: none; display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); overflow: hidden; }
+.zoombar button { border: 0; background: none; min-width: 32px; height: 30px; padding: 0 10px; font-size: 13px; font-weight: 600; color: var(--fg2); cursor: pointer; }
+.zoombar button:hover { color: var(--blue); background: var(--blue-tint); }
+.zoombar button + button, .zoombar span + button { border-left: 1px solid var(--border); }
+#zoomPct { min-width: 52px; text-align: center; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--fg2); border-left: 1px solid var(--border); line-height: 30px; }
+.legend { flex: 1 1 auto; display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 4px 12px 8px; font-size: 12px; color: var(--fg2); }
+.legend i { display: inline-block; width: 22px; height: 0; border-top: 3px solid; vertical-align: middle; margin-right: 6px; }
+.legend i.dash { border-top-style: dashed; }
+.side { display: grid; gap: 14px; }
+.scrim { position: fixed; inset: 0; background: rgba(10,27,54,.35); z-index: 20; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(420px, 92vw); z-index: 21; background: var(--bg); border-left: 1px solid var(--border);
+  box-shadow: -16px 0 40px rgba(10,27,54,.18); display: flex; flex-direction: column; transform: translateX(100%); visibility: hidden;
+  transition: transform .22s ease, visibility 0s linear .22s; }
+.drawer.open { transform: none; visibility: visible; transition: transform .22s ease; }
+.drawer-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.drawer-h h2 { font-size: 16px; margin: 0; }
+.drawer-b { flex: 1; overflow-y: auto; padding: 14px 16px 24px; display: grid; gap: 14px; align-content: start; }
+@media (prefers-reduced-motion: reduce) { .drawer { transition: none; } }
+.card { padding: 14px 16px; }
+.card h2 { font-size: 15px; line-height: 1.35; margin: 0 0 8px; }
+.card h3 { font-size: 13px; margin: 12px 0 6px; color: var(--fg2); font-weight: 600; }
+.kv { width: 100%; border-collapse: collapse; font-size: 13px; }
+.kv td { padding: 4px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+.kv td:last-child { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; padding-left: 10px; }
+.kv tr:last-child td { border-bottom: 0; }
+.kv .muted { color: var(--fg3); font-size: 12px; }
+ul.notes { margin: 0; padding-left: 18px; font-size: 13px; color: var(--fg2); }
+ul.notes li { margin: 4px 0; }
+ul.notes b { color: var(--fg); font-weight: 600; }
+.warnbox { border-left: 3px solid var(--warn); background: var(--warn-tint); padding: 8px 10px; border-radius: 4px; font-size: 13px; margin-top: 8px; }
+.src { font-size: 12px; color: var(--fg3); }
+.foot { font-size: 12px; color: var(--fg3); }
+
+/* ----- SVG ----- */
+svg text { font-family: var(--font); fill: var(--fg); }
+.eq { fill: var(--equip); stroke: var(--equip-stroke); stroke-width: 1.5; }
+.eq2 { fill: var(--equip-2); stroke: var(--equip-stroke); stroke-width: 1.2; }
+.eqdash { fill: none; stroke: var(--equip-stroke); stroke-width: 1.4; stroke-dasharray: 5 4; }
+.eqline { fill: none; stroke: var(--equip-stroke); stroke-width: 1.5; }
+.coil { fill: none; stroke: var(--equip-stroke); stroke-width: 2.4; stroke-linejoin: round; }
+.coil.hot { stroke: var(--flow-steam); opacity: .55; }
+.coil.rh { stroke: var(--flow-rh); opacity: .55; }
+.coil.eco { stroke: var(--flow-water); opacity: .7; }
+.hdr { fill: var(--equip-2); stroke: var(--equip-stroke); stroke-width: 1; }
+.lbl { font-size: 12px; font-weight: 600; fill: var(--fg2); paint-order: stroke; stroke: var(--canvas); stroke-width: 4px; stroke-linejoin: round; }
+.lbl.in { stroke: var(--equip); }
+.sm { font-size: 10.5px; fill: var(--fg2); paint-order: stroke; stroke: var(--canvas); stroke-width: 3px; stroke-linejoin: round; }
+.sm.in { stroke: var(--equip); }
+.xs { font-size: 9.5px; fill: var(--fg3); }
+.casing { font-size: 13px; font-weight: 700; fill: var(--fg); }
+.halo { fill: none; stroke: var(--canvas); stroke-width: 11; stroke-linecap: butt; stroke-linejoin: round; }
+.pipe { fill: none; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; opacity: .26; }
+.flow { fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 10 12; animation: dash var(--dur, 2.4s) linear infinite; }
+.flow.still { stroke-dasharray: 5 5; animation: none; opacity: .75; }
+.flow.thin { stroke-width: 1.6; stroke-dasharray: 4 4; animation-duration: 4s; }
+.flow.hidden { stroke-dasharray: 2 5; animation: none; opacity: .55; stroke-width: 2; }
+.inner { fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-dasharray: 10 12; animation: dash 2.4s linear infinite; opacity: .9; }
+@keyframes dash { to { stroke-dashoffset: -44; } }
+.paused .flow, .paused .inner, .paused .spin, .paused .flicker { animation-play-state: paused !important; }
+.spin { transform-box: fill-box; transform-origin: center; animation: spin var(--spin, 6s) linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.flicker { transform-box: fill-box; transform-origin: top center; animation: flick .9s ease-in-out infinite alternate; }
+@keyframes flick { from { transform: scaleY(.8); opacity: .75; } to { transform: scaleY(1.06); opacity: 1; } }
+.flicker.h { transform-origin: left center; animation-name: flickh; }
+.flicker.h.r { transform-origin: right center; }
+@keyframes flickh { from { transform: scaleX(.8); opacity: .75; } to { transform: scaleX(1.06); opacity: 1; } }
+.lead { stroke: var(--fg3); stroke-width: 1; stroke-dasharray: 2 3; fill: none; }
+.leaddot { fill: var(--fg3); }
+.tag { cursor: pointer; }
+.tag:focus { outline: none; }
+.tag .box { fill: var(--label-bg); stroke: var(--border); stroke-width: 1; }
+.tag:hover .box, .tag:focus-visible .box { stroke: var(--blue); stroke-width: 2; }
+.tag .tt { font-size: 11px; font-weight: 700; fill: var(--fg2); letter-spacing: .2px; }
+.tag .tl { font-size: 10.5px; fill: var(--fg3); }
+.tag .tv { font-size: 12.5px; font-weight: 700; fill: var(--fg); font-variant-numeric: tabular-nums; }
+.tag .tu { font-size: 10px; fill: var(--fg3); }
+.tag .tv.fixed, .tag .tv.proxy { fill: var(--fg3); font-style: italic; }
+.tag .tv.missing { fill: var(--fg3); font-weight: 600; }
+.tag[data-warn="true"] .box { stroke: var(--warn); stroke-width: 2; }
+.tag .tv.warn { fill: var(--warn); }
+.tag[data-missing="true"] .box { stroke-dasharray: 4 3; fill: none; stroke: var(--fg3); }
+.flag { fill: var(--warn); }
+.flagt { font-size: 10px; font-weight: 700; fill: #0A1B36; }
+.conn { fill: var(--equip-2); stroke: var(--equip-stroke); stroke-width: 1; }
+@media (prefers-reduced-motion: reduce) { .flow, .inner, .spin, .flicker { animation: none !important; } }
+
+dialog { border: 1px solid var(--border); border-radius: 8px; padding: 0; width: min(440px, calc(100vw - 32px)); background: var(--surface); color: var(--fg); box-shadow: 0 16px 40px rgba(10,27,54,.25); }
+dialog::backdrop { background: rgba(10,27,54,.35); }
+.dlg-h { display: flex; justify-content: space-between; align-items: start; gap: 12px; padding: 14px 16px 10px; border-bottom: 1px solid var(--border); }
+.dlg-h h2 { font-size: 16px; margin: 0; line-height: 1.35; }
+.dlg-h code { font-family: var(--mono); font-size: 12px; color: var(--fg2); }
+.dlg-b { padding: 12px 16px 16px; display: grid; gap: 10px; font-size: 13px; }
+.x { border: 1px solid var(--border); background: var(--surface); border-radius: 4px; width: 32px; height: 32px; cursor: pointer; flex: none; }
+.shifts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.shifts div { background: var(--subtle); border-radius: 4px; padding: 6px 8px; }
+.shifts span { display: block; font-size: 11px; color: var(--fg3); }
+.shifts b { font-variant-numeric: tabular-nums; }
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="tabs">
+    <h1 title="Sơ đồ HMI · Hiệu suất nhiệt PMS">Quảng Ninh</h1>
+    <div role="tablist" aria-label="Màn sơ đồ" class="tablist">
+      <button class="tab" role="tab" id="tab-boiler" aria-selected="true" aria-controls="screen">Lò hơi</button>
+      <button class="tab" role="tab" id="tab-turbine" aria-selected="false" aria-controls="screen">Tua bin</button>
+    </div>
+    <div class="tabs-end">
+      <div class="seg" role="group" aria-label="Tổ máy" id="unitSeg">
+        <button type="button" data-unit="0" aria-pressed="true" title="Báo cáo khảo sát 4.1.3 Quảng Ninh 1">Tổ 2 · QN1</button>
+        <button type="button" data-unit="1" aria-pressed="false" title="Báo cáo khảo sát 4.1.4 Quảng Ninh 2">Tổ 3 · QN2</button>
+      </div>
+      <div class="seg" role="group" aria-label="Ca" id="shiftSeg">
+        <button type="button" data-shift="0" aria-pressed="true" title="07/08/2024">Ca 1</button>
+        <button type="button" data-shift="1" aria-pressed="false" title="08/03/2024">Ca 2</button>
+        <button type="button" data-shift="2" aria-pressed="false" title="08/03/2024">Ca 3</button>
+      </div>
+      <button type="button" class="toggle" id="animBtn" aria-pressed="true">Hoạt ảnh</button>
+      <button type="button" class="toggle" id="isaBtn" aria-pressed="false">ISA-101</button>
+      <button type="button" class="toggle" id="themeBtn" aria-pressed="false">Nền tối</button>
+      <button type="button" class="toggle" id="drawerBtn" aria-expanded="false" aria-controls="drawer">Thông tin &amp; thiết kế</button>
+      <button type="button" class="toggle" id="fsBtn" aria-pressed="false">Toàn màn hình</button>
+    </div>
+  </header>
+
+  <section class="screen panel" id="screen">
+    <div class="mimic" id="mimic"></div>
+    <div class="foot-row">
+      <div class="legend" id="legend"></div>
+      <div class="zoombar" role="group" aria-label="Thu phóng sơ đồ" title="Cuộn chuột để phóng to/thu nhỏ, kéo để di chuyển, nhấp đúp để vừa khung">
+        <button type="button" id="zoomOut" aria-label="Thu nhỏ">−</button>
+        <span id="zoomPct" aria-live="polite">100%</span>
+        <button type="button" id="zoomIn" aria-label="Phóng to">+</button>
+        <button type="button" id="zoomFit">Vừa khung</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" aria-label="Thông tin và thiết kế" aria-hidden="true">
+  <div class="drawer-h"><h2>Thông tin &amp; thiết kế</h2><button class="x" type="button" id="drawerClose" aria-label="Đóng">✕</button></div>
+  <div class="drawer-b">
+    <p class="src">Nguồn: báo cáo khảo sát 4.1.3 (Quảng Ninh 1) và 4.1.4 (Quảng Ninh 2), Rev 2 (PECC3, 2024). Hai báo cáo mô tả thiết bị giống hệt nhau vì 4 tổ máy cùng một thiết kế. Bố trí lò lấy từ bản vẽ Alstom 0.05.008.00.52 P0200 (bố trí bề mặt chịu áp, nửa trên) và P0001 (bố trí chung); chuỗi gia nhiệt lấy từ sơ đồ nhiệt chi tiết tổ máy 300 MW, đều trong docs/pms/thermal-diagrams/Quảng Ninh.</p>
+    <div class="side" id="side"></div>
+    <p class="src">Số liệu: Bảng 4-1, 4-2, 4-3 của mỗi báo cáo — tổ máy 2 (Quảng Ninh 1) và tổ máy 3 (Quảng Ninh 2). Ca 1 lấy ngày 07/08/2024 (mùa mưa, tải thấp ổn định), ca 2 và ca 3 lấy ngày 08/03/2024, nên không có ô trung bình. Áp suất ghi MPa như bảng khảo sát; Bảng 3-1 ghi số thiết kế là MPa dư. Repo chưa có workbook hay mẫu cấu hình Quảng Ninh. Bấm vào ô số liệu để xem dòng nguồn trong bảng khảo sát, giá trị 6 ca và số thiết kế.</p>
+  </div>
+</aside>
+
+<dialog id="dlg" aria-labelledby="dlgTitle">
+  <div class="dlg-h"><div><h2 id="dlgTitle"></h2><code id="dlgKey"></code></div><button class="x" type="button" id="dlgClose" aria-label="Đóng">✕</button></div>
+  <div class="dlg-b" id="dlgBody"></div>
+</dialog>
+
+<script>
+'use strict';
+
+/* ---------- Bộ số liệu: tổ 2 (QN1) ca 1–3, tổ 3 (QN2) ca 1–3 ---------- */
+const SETS = [
+  { unit: 'Tổ 2', ca: 'Ca 1', date: '07/08/2024' }, { unit: 'Tổ 2', ca: 'Ca 2', date: '08/03/2024' }, { unit: 'Tổ 2', ca: 'Ca 3', date: '08/03/2024' },
+  { unit: 'Tổ 3', ca: 'Ca 1', date: '07/08/2024' }, { unit: 'Tổ 3', ca: 'Ca 2', date: '08/03/2024' }, { unit: 'Tổ 3', ca: 'Ca 3', date: '08/03/2024' },
+];
+const B31 = 'Bảng 3-1: ', B42 = 'Bảng 4-2', B43 = 'Bảng 4-3', B41 = 'Bảng 4-1';
+/* ---------- Mô tả tín hiệu: tên, đơn vị, số lẻ, chế độ, dòng nguồn trong bảng khảo sát, số thiết kế, mã cảnh báo, 6 giá trị ---------- */
+const S = {
+  PG: ['Công suất phát đầu cực', 'MW', 2, 'M', B41 + ' dòng 1', 'Định mức 300 MW; máy phát 353 MVA, 20 kV, cos φ 0,85.', null, [252.13, 283.13, 244.5, 254.0, 282.63, 238.88]],
+  BOILER_STEAM_FLOW: ['Lưu lượng hơi quá nhiệt ra lò', 't/h', 1, 'M', B42 + ' dòng 2', B31 + 'BMCR 995 t/h, RO 889,1 t/h.', 'copy', [765.5, 829.3, 716.2, 765.5, 878.2, 742.3]],
+  BOILER_STEAM_PRESSURE: ['Áp suất hơi quá nhiệt ra lò', 'MPa', 1, 'M', B42 + ' dòng 4', B31 + '17,29 MPa(g) BMCR, 17,13 MPa(g) RO.', 'copy', [15.5, 16.3, 15.3, 15.5, 16.1, 15.1]],
+  BOILER_STEAM_TEMP: ['Nhiệt độ hơi quá nhiệt ra lò', '°C', 1, 'M', B42 + ' dòng 3', B31 + '541 °C ở BMCR và RO.', 'copy', [537.2, 535.8, 539.1, 537.2, 534.2, 538.1]],
+  BOILER_REHEAT_TEMP: ['Nhiệt độ hơi tái nhiệt nóng ra lò', '°C', 1, 'M', B42 + ' dòng 5', B31 + '540 °C. Chỉnh bằng phun giảm ôn ở tái nhiệt lạnh.', 'copy', [534.8, 535.5, 538.7, 534.8, 528.0, 531.1]],
+  ECO_FW_TEMP: ['Nhiệt độ nước cấp vào bộ hâm', '°C', 1, 'M', B42 + ' dòng 6', B31 + '281 °C BMCR, 273 °C RO.', 'copy', [266.2, 268.9, 262.2, 266.2, 267.7, 257.2]],
+  ECO_FW_FLOW: ['Lưu lượng nước cấp vào bộ hâm', 't/h', 1, 'M', B42 + ' dòng 7', null, 'copy', [720.0, 824.8, 698.0, 720.0, 872.6, 722.8]],
+  PA_IN_TEMP: ['Nhiệt độ gió cấp 1 vào bộ sấy', '°C', 1, 'M', B42 + ' dòng 8', 'Quạt gió cấp 1 thiết kế: gió vào 39 °C (T.B), 24 °C (BMCR).', null, [39.2, 28.47, 25.05, 39.7, 29.37, 24.8]],
+  SA_IN_TEMP: ['Nhiệt độ gió cấp 2 vào bộ sấy', '°C', 1, 'M', B42 + ' dòng 9', 'Bộ sấy gió bằng hơi chỉ đưa vào khi gió vào quạt dưới 24 °C.', null, [34.44, 23.2, 20.5, 34.77, 24.12, 20.39]],
+  PA_OUT_TEMP: ['Nhiệt độ gió cấp 1 ra bộ sấy', '°C', 1, 'M', B42 + ' dòng 10', null, null, [315.9, 338.29, 327.76, 314.7, 321.95, 307.74]],
+  SA_OUT_TEMP: ['Nhiệt độ gió cấp 2 ra bộ sấy', '°C', 1, 'M', B42 + ' dòng 11', null, null, [330.8, 324.41, 313.33, 330.7, 336.22, 324]],
+  PA_FLOW: ['Lưu lượng gió cấp 1', 't/h', 1, 'M', B42 + ' dòng 12 (kg/h ÷ 1000)', 'Gió cấp 1 chỉ vận chuyển than bột từ 16 máy cấp than bột tới vòi đốt; sấy than trong máy nghiền dùng gió nóng và khói lấy ở phễu lạnh.', null, [111.944, 114.075, 98.355, 173.611, 184.936, 155.107]],
+  SA_FLOW: ['Lưu lượng gió cấp 2', 't/h', 1, 'M', B42 + ' dòng 13 (kg/h ÷ 1000)', 'Khoảng 50 % qua 34 cửa trên vai lò (17 cửa mỗi vai), 50 % qua 64 cửa gió cấp 3 trên tường đứng dưới vai lò.', null, [853.753, 914.989, 788.902, 1105.72, 1159.592, 972.557]],
+  GAS_IN_TEMP: ['Nhiệt độ khói vào bộ sấy', '°C', 0, 'M', B42 + ' dòng 15', 'Khói vào bộ sấy không được quá 450 °C tức thời, 430 °C liên tục.', null, [374, 383, 370, 373, 380, 365]],
+  GAS_OUT_TEMP: ['Nhiệt độ khói ra bộ sấy', '°C', 0, 'M', B42 + ' dòng 16', null, null, [131, 110, 105, 137, 126, 120]],
+  O2_IN: ['O₂ khói vào bộ sấy', '%', 2, 'M', B42 + ' dòng 18', null, null, [4.48, 4.36, 5.06, 4.43, 4.0, 4.77]],
+  O2_OUT: ['O₂ khói ra bộ sấy', '%', 2, 'M', B42 + ' dòng 19', null, null, [5.38, 5.32, 6.17, 5.81, 5.58, 6.65]],
+  AMBIENT_TEMP: ['Nhiệt độ môi trường', '°C', 2, 'M', B42 + ' dòng 20', 'Cùng giá trị ở hai tổ máy (cùng ngày, cùng hiện trường).', null, [31.5, 19.1, 18.65, 31.5, 19.1, 18.65]],
+  HUMIDITY: ['Độ ẩm tương đối không khí', '%', 0, 'M', B42 + ' dòng 21', null, 'const', [80, 80, 80, 80, 80, 80]],
+  ATM_PRESSURE: ['Áp suất khí quyển', 'Pa', 0, 'M', B42 + ' dòng 22', null, 'const', [101800, 101800, 101800, 101800, 101800, 101800]],
+  COAL_DCS: ['Than tiêu thụ theo DCS', 't/h', 2, 'M', B41 + ' dòng 3.2', 'Than antraxit Hòn Gai, Cẩm Phả. Đốt gián tiếp qua 2 kho than bột 1100 m³.', null, [119.3, 123.22, 127.07, 122.39, 126.91, 119.31]],
+  COAL_QC: ['Nhiệt trị cao của than', 'kJ/kg', 0, 'M', B42 + ' dòng 23', 'Than thiết kế (Bảng 3-2): HHV 4980 kcal/kg ≈ 20 850 kJ/kg, LHV 4790 kcal/kg.', null, [20672, 21021.7, 21299.4, 20497.4, 20775.1, 20776]],
+  COAL_W: ['Độ ẩm của than', '%', 2, 'M', B42 + ' dòng 24', 'Thiết kế 9 % (toàn phần).', null, [9.34, 8.71, 8.65, 8.9, 9.12, 8.31]],
+  COAL_V: ['Chất bốc của than', '%', 2, 'M', B42 + ' dòng 30', 'Thiết kế 6,83 % (than làm việc).', null, [10.91, 10.65, 9.69, 11.11, 8.98, 10.94]],
+  COAL_A: ['Độ tro của than', '%', 2, 'M', B42 + ' dòng 33', 'Thiết kế 30,49 % (than làm việc).', null, [29.67, 30.18, 29.5, 30.35, 30.65, 30.99]],
+  FLY_ASH_COMBUSTIBLE: ['Chất cháy còn lại trong tro bay', '%', 2, 'M', B42 + ' dòng 31', null, null, [8.3, 6.63, 6.63, 7.86, 6.52, 6.52]],
+  BOTTOM_ASH_COMBUSTIBLE: ['Chất cháy còn lại trong xỉ đáy', '%', 2, 'M', B42 + ' dòng 32', null, 'const', [12, 12, 12, 12, 12, 12]],
+  TURBINE_STEAM_FLOW: ['Lưu lượng hơi chính vào tua bin', 't/h', 1, 'M', B43 + ' dòng 2', null, null, [765.5, 829.3, 716.2, 808.9, 878.2, 742.3]],
+  TURBINE_STEAM_PRESSURE: ['Áp suất hơi chính vào tua bin', 'MPa', 1, 'M', B43 + ' dòng 3', 'Bảng 1-1: tua bin 300 MW, 170 kg/cm², 538/538 °C.', null, [15.5, 16.3, 15.3, 15.6, 16.1, 15.1]],
+  TURBINE_STEAM_TEMP: ['Nhiệt độ hơi chính vào tua bin', '°C', 1, 'M', B43 + ' dòng 4', null, null, [537.2, 535.8, 539.1, 534.0, 534.2, 538.1]],
+  FW_FLOW: ['Lưu lượng nước cấp vào bộ hâm', 't/h', 1, 'M', B43 + ' dòng 5', null, null, [720.0, 824.8, 698.0, 791.6, 872.6, 722.8]],
+  FW_PRESSURE: ['Áp suất nước cấp', 'MPa', 1, 'M', B43 + ' dòng 6', null, null, [17.0, 18.7, 16.1, 17.3, 18.2, 15.4]],
+  FW_TEMP: ['Nhiệt độ nước cấp', '°C', 1, 'M', B43 + ' dòng 7', 'Bằng nước ra GNC8 ở cả 6 ca.', null, [266.2, 268.9, 262.2, 262.8, 267.7, 257.2]],
+  SH_SPRAY_FLOW: ['Lưu lượng phun giảm ôn quá nhiệt', 't/h', 1, 'M', B43 + ' dòng 8', 'Hai cấp phun: sau quá nhiệt cấp 1 và sau quá nhiệt cấp 2, mỗi cấp 2 nhánh.', null, [74.9, 65.3, 69.3, 34.9, 34.6, 38.2]],
+  SH_SPRAY_PRESSURE: ['Áp suất nước phun giảm ôn quá nhiệt', 'MPa', 1, 'M', B43 + ' dòng 9', null, 'shsp', [17.8, 19.3, 16.7, 17.4, 7.1, 6.0]],
+  SH_SPRAY_TEMP: ['Nhiệt độ nước phun giảm ôn quá nhiệt', '°C', 1, 'M', B43 + ' dòng 10', 'Gần nhiệt độ nước sau bơm cấp, trước các bình GNC.', null, [172.4, 178.1, 172.4, 169.3, 173.0, 166.2]],
+  RH_SPRAY_FLOW: ['Lưu lượng phun giảm ôn tái nhiệt', 't/h', 1, 'M', B43 + ' dòng 11', 'Một bộ phun trên đường tái nhiệt lạnh (khảo sát mục 3.1.1.3).', null, [19.1, 19.0, 22.1, 2.4, 3.5, 6.6]],
+  RH_SPRAY_PRESSURE: ['Áp suất nước phun giảm ôn tái nhiệt', 'MPa', 1, 'M', B43 + ' dòng 12', null, null, [9.6, 10.6, 9.1, 5.7, 10.3, 8.7]],
+  RH_SPRAY_TEMP: ['Nhiệt độ nước phun giảm ôn tái nhiệt', '°C', 1, 'M', B43 + ' dòng 13', null, null, [170.4, 176.1, 170.4, 164.3, 168.0, 161.2]],
+  'GNC8.FW_OUT': ['Nhiệt độ nước ra GNC8', '°C', 1, 'M', B43 + ' dòng 14 ("GNC1")', 'Khảo sát gọi bình gia nhiệt cao áp cuối là GNC1; sơ đồ nhiệt chi tiết gọi là GNCA 8 (1LAD10AC001).', null, [266.2, 268.9, 262.2, 262.8, 267.7, 257.2]],
+  'GNC8.FW_IN': ['Nhiệt độ nước vào GNC8', '°C', 1, 'M', B43 + ' dòng 15 ("GNC1")', null, null, [230.2, 229.9, 223.2, 230.6, 232.5, 222.0]],
+  'GNC8.EXT_P': ['Áp suất hơi trích 1 vào GNC8', 'MPa', 1, 'M', B43 + ' dòng 16 ("cửa trích số 1")', 'Hơi trích từ giữa thân HP.', null, [5.1, 5.3, 4.6, 5.2, 5.5, 4.7]],
+  'GNC8.EXT_T': ['Nhiệt độ hơi trích 1', '°C', 1, 'M', B43 + ' dòng 17', null, null, [391.0, 384.2, 388.1, 386.0, 385.2, 389.1]],
+  'GNC8.DRAIN': ['Nhiệt độ nước đọng ra GNC8', '°C', 1, 'M', B43 + ' dòng 18', 'Cao hơn nước vào 3–6 K; đọng dồn cấp về GNC7.', null, [236.2, 235.9, 229.2, 233.6, 237.5, 226.0]],
+  'GNC7.FW_OUT': ['Nhiệt độ nước "ra" GNC7 (theo bảng)', '°C', 1, 'M', B43 + ' dòng 19 ("đầu ra GNC2")', 'Khảo sát gọi là GNC2; sơ đồ nhiệt chi tiết gọi là GNC 7 (1LAD30AC001).', 'swap', [205.2, 174.9, 168.2, 203.6, 177.5, 167.0]],
+  'GNC7.FW_IN': ['Nhiệt độ nước "vào" GNC7 (theo bảng)', '°C', 1, 'M', B43 + ' dòng 20 ("đầu vào GNC2")', null, 'swap', [230.2, 229.9, 223.2, 230.6, 232.5, 222.0]],
+  'GNC7.EXT_P': ['Áp suất hơi trích 2 (thoát HP) vào GNC7', 'MPa', 1, 'M', B43 + ' dòng 21 ("cửa trích số 2")', 'Bằng áp suất hơi vào bộ tái nhiệt ở cả 6 ca.', null, [2.8, 2.9, 2.5, 2.8, 2.9, 2.5]],
+  'GNC7.EXT_T': ['Nhiệt độ hơi trích 2', '°C', 1, 'M', B43 + ' dòng 22', null, null, [319.0, 312.2, 316.1, 315.0, 311.2, 315.1]],
+  'GNC7.DRAIN': ['Nhiệt độ nước đọng ra GNC7', '°C', 1, 'M', B43 + ' dòng 23', 'Cao hơn số ghi ở dòng "đầu ra" 3–8 K, đúng như nước đọng so với nước vào.', null, [208.2, 193.9, 187.2, 205.6, 185.5, 175.0]],
+  AUX_STEAM_FLOW: ['Lưu lượng hơi tự dùng', 't/h', 1, 'M', B43 + ' dòng 24', 'Hơi tự dùng 5,25 bar dùng hoá mù dầu và thổi vòi đốt; bộ sấy gió bằng hơi cũng lấy hơi từ hệ thống này.', null, [0.2, 0, 0, 0.9, 0, 0]],
+  AUX_STEAM_PRESSURE: ['Áp suất hơi tự dùng', 'MPa', 1, 'M', B43 + ' dòng 25', 'Trùng áp suất hơi vào bộ tái nhiệt ở cả 6 ca, tức điểm đo nằm ở nguồn tái nhiệt lạnh.', null, [2.9, 2.9, 2.5, 2.8, 2.9, 2.5]],
+  AUX_STEAM_TEMP: ['Nhiệt độ hơi tự dùng', '°C', 1, 'M', B43 + ' dòng 26', 'Trùng nhiệt độ hơi vào bộ tái nhiệt ở cả 6 ca.', null, [319.0, 311.2, 315.1, 307.0, 303.2, 307.1]],
+  CRH_PRESSURE: ['Áp suất hơi vào bộ tái nhiệt', 'MPa', 1, 'M', B43 + ' dòng 27', B31 + '3,53 MPa(g) BMCR, 3,14 MPa(g) RO.', null, [2.9, 2.9, 2.5, 2.8, 2.9, 2.5]],
+  CRH_TEMP: ['Nhiệt độ hơi vào bộ tái nhiệt', '°C', 1, 'M', B43 + ' dòng 28', B31 + '320 °C BMCR, 309 °C RO.', null, [319.0, 311.2, 315.1, 307.0, 303.2, 307.1]],
+  HRH_PRESSURE: ['Áp suất hơi ra bộ tái nhiệt', 'MPa', 1, 'M', B43 + ' dòng 29', B31 + '3,34 MPa(g) BMCR, 2,98 MPa(g) RO; lưu lượng tái nhiệt 882,5 / 736,4 t/h.', null, [2.7, 2.8, 2.4, 2.7, 2.7, 2.3]],
+  HRH_TEMP: ['Nhiệt độ hơi ra bộ tái nhiệt', '°C', 1, 'M', B43 + ' dòng 30', B31 + '540 °C.', 'rhdiff', [534.8, 535.5, 538.7, 525.0, 528.0, 531.1]],
+  CONDENSER_PRESSURE: ['Áp suất bình ngưng (tuyệt đối)', 'kPa', 2, 'M', B41 + ' dòng 8', 'Bảng ghi tên "chân không bình ngưng" nhưng số 6,6–9,9 kPa là áp suất tuyệt đối. Bình ngưng làm mát bằng nước biển sông Diễn Vọng.', null, [9.14, 6.99, 6.63, 9.85, 7.12, 6.74]],
+  CW_IN_TEMP: ['Nhiệt độ nước tuần hoàn', '°C', 2, 'M', B41 + ' dòng 7', 'Giống nhau ở hai tổ máy (chung kênh nhận nước). 3 bơm tuần hoàn mỗi tổ.', null, [33.84, 22.94, 22.75, 33.84, 22.94, 22.75]],
+  CW_OUT_TEMP: ['Nhiệt độ nước tuần hoàn ra bình ngưng', '°C', 1, 'A', null, null, null, null],
+  MAKEUP_FLOW: ['Lưu lượng nước bổ sung', 't/h', 1, 'M', B43 + ' dòng 31', null, null, [6.9, 3.4, 8.4, 8.2, 10.6, 13.6]],
+  MAKEUP_TEMP: ['Nhiệt độ nước bổ sung', '°C', 1, 'M', B43 + ' dòng 32', null, null, [30.9, 23.4, 22.9, 28.7, 20.0, 19.5]],
+};
+/* Kết quả tính trong báo cáo (Bảng 4-1, 4-2) */
+const EX = {
+  L1: [3.87, 3.85, 4.05, 3.84, 4.0, 4.03], L2: [4.7, 3.89, 3.75, 4.63, 3.94, 3.99], L3: [2.74, 2.78, 2.79, 2.72, 2.76, 2.77],
+  L4: [1.17, 1.08, 1.06, 1.12, 1.15, 1.05], L5: [0.17, 0.08, 0.08, 0.16, 0.08, 0.08], L6: [0.05, 0.05, 0.05, 0.05, 0.05, 0.05],
+  L7: [0.4, 0.4, 0.4, 0.4, 0.4, 0.4], L9: [0.4, 0.4, 0.4, 0.4, 0.4, 0.4], sumL: [13.5, 12.52, 12.58, 13.32, 12.78, 12.76],
+  etaB: [86.5, 87.48, 87.42, 86.68, 87.22, 87.24], ER: [10.86, 10.38, 10.22, 8.91, 9.11, 9.26],
+  coalCalc: [124.52, 132.58, 116.13, 126.71, 134.43, 116.41], coalDcs: [119.3, 123.22, 127.07, 122.39, 126.91, 119.31],
+  HR: [8787, 8567.96, 8799.46, 8818, 8575.83, 8788.6], etaTB: [40.97, 42.02, 40.91, 40.82, 41.98, 40.96],
+  HRcorr: [8497, 8486.94, 8697.08, 8450, 8455.56, 8649.84], etaTBcorr: [42.37, 42.42, 41.39, 42.6, 42.58, 41.62],
+  HRtho: [10209, 9843.73, 10116.23, 10225, 9881.72, 10124.34], HRnghich: [11453, 10983.28, 11268.42, 11225, 10872.29, 11157.79],
+  HRthuan: [10971, 10206.21, 12327.91, 10841, 10261.98, 11433.92], etaTho: [35.26, 36.57, 35.59, 35.21, 36.43, 35.56],
+  etaTinh: [31.43, 32.78, 31.95, 32.07, 33.11, 32.26],
+};
+const MODE_TEXT = { M: 'Số đo trong bảng khảo sát', A: 'Bảng khảo sát không có' };
+
+/* ---------- Trạng thái: bộ số liệu = tổ × 3 + ca ---------- */
+const state = { scene: 'boiler', unit: 0, shift: 0, anim: true, isa: false };
+const dsOf = (shift = state.shift) => state.unit * 3 + shift;
+const fmt = (v, d) => v == null || Number.isNaN(v) ? '—' : v.toLocaleString('vi-VN', { minimumFractionDigits: d, maximumFractionDigits: d });
+function valueAt(key, ds) { const m = S[key]; return !m || m[3] === 'A' || !m[7] ? null : m[7][ds]; }
+function valueOf(key, shift = state.shift) { return valueAt(key, dsOf(shift)); }
+function exOf(key) { return EX[key][dsOf()]; }
+/* Cảnh báo chỉ đúng ở một số bộ số liệu thì chỉ tô ở bộ đó. */
+const WARN_DS = { copy: [3], shsp: [4, 5], rhdiff: [3] };
+function hasWarn(key) { return !!(S[key] && S[key][6]); }
+function isWarn(key, ds = dsOf()) { if (!hasWarn(key)) return false; const only = WARN_DS[S[key][6]]; return !only || only.includes(ds); }
+function perSets(k, m) {
+  return `<div class="shifts">${SETS.map((s, i) => `<div${i === dsOf() ? ' style="font-weight:700"' : ''}><span>${s.unit} · ${s.ca}</span><b>${fmt(valueAt(k, i), m[2])}</b> ${m[1]}</div>`).join('')}</div>`;
+}
+function warnText(key) {
+  const c = S[key][6];
+  const v = (k, i, d = 1) => fmt(valueAt(k, i), d);
+  if (c === 'const') return 'Bằng nhau ở cả 6 ca của hai tổ máy (' + v(key, 0, S[key][2]) + ' ' + S[key][1] + '): số giả định, không phải số đo theo ca.';
+  if (c === 'copy') return 'Tổ 3, ca 1: các số lò hơi (hơi quá nhiệt, tái nhiệt, nước vào bộ hâm) trùng khít với tổ 2 ca 1 của báo cáo Quảng Ninh 1, trong khi Bảng 4-3 của chính tổ 3 ghi hơi chính ' + v('TURBINE_STEAM_FLOW', 3) + ' t/h, nước cấp ' + v('FW_FLOW', 3) + ' t/h, tái nhiệt ra ' + v('HRH_TEMP', 3) + ' °C. Nhiều khả năng Bảng 4-2 của tổ 3 ca 1 bị chép từ tổ 2.';
+  if (c === 'shsp') return 'Tổ 3, ca 2 và ca 3: áp suất nước phun ' + v(key, 4) + ' và ' + v(key, 5) + ' MPa, thấp hơn nhiều áp suất hơi quá nhiệt (' + v('BOILER_STEAM_PRESSURE', 4) + ' và ' + v('BOILER_STEAM_PRESSURE', 5) + ' MPa) nên không thể phun được, nhưng lưu lượng phun vẫn ghi ' + v('SH_SPRAY_FLOW', 4) + ' và ' + v('SH_SPRAY_FLOW', 5) + ' t/h. Tổ 2 và tổ 3 ca 1 ghi 16,7–19,3 MPa.';
+  if (c === 'swap') return 'Dòng "đầu ra GNC2" (' + [0, 1, 2].map((i) => v('GNC7.FW_OUT', i)).join(' / ') + ' °C ở tổ 2) thấp hơn dòng "đầu vào GNC2" (' + [0, 1, 2].map((i) => v('GNC7.FW_IN', i)).join(' / ') + ' °C), và số "đầu vào" trùng khít nước vào GNC1 ở cả 6 ca. Hai dòng bị đảo: nước vào GNC7 là số ghi ở dòng "đầu ra", nước ra GNC7 bằng nước vào GNC8.';
+  if (c === 'rhdiff') return 'Tổ 3, ca 1: tua bin ghi tái nhiệt ra ' + v(key, 3) + ' °C, còn bảng lò ghi ' + v('BOILER_REHEAT_TEMP', 3) + ' °C (trùng tổ 2) — xem cảnh báo chép số ở bảng lò.';
+  return '';
+}
+document.getElementById('unitSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  state.unit = Number(b.dataset.unit);
+  document.querySelectorAll('#unitSeg button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  render();
+});
+
+/* ---------- Trình vẽ SVG ---------- */
+const COLORS = { steam: '--flow-steam', rh: '--flow-rh', water: '--flow-water', gasHot: '--flow-gas-hot', gas: '--flow-gas', gasCool: '--flow-gas-cool',
+  airHot: '--flow-air-hot', airCold: '--flow-air-cold', coal: '--flow-coal', cw: '--flow-cw', ash: '--fg3' };
+function markers() {
+  return Object.entries(COLORS).map(([k, v]) => `<marker id="m-${k}" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" style="fill:var(${v})"/></marker>`).join('');
+}
+/** Một đường ống: lớp viền nền (cầu vượt khi giao nhau), lớp ống mờ, lớp dòng chảy có mũi tên. */
+function P(d, kind, o = {}) {
+  const c = `var(${COLORS[kind]})`;
+  const cls = ['flow', o.still && 'still', o.thin && 'thin', o.hidden && 'hidden'].filter(Boolean).join(' ');
+  const mk = o.noArrow || o.hidden ? '' : ` marker-end="url(#m-${kind})"`;
+  const dur = o.dur ? ` style="--dur:${o.dur}"` : '';
+  return `${o.noHalo || o.hidden ? '' : `<path class="halo" d="${d}"/>`}${o.thin || o.hidden ? '' : `<path class="pipe" d="${d}" style="stroke:${c}"/>`}<path class="${cls}" d="${d}" stroke="${c}"${mk}${dur}/>`;
+}
+/** Dòng chảy bên trong thiết bị (khói, gió): không có ống mờ, không viền nền. */
+function F(d, kind, dur) { return `<path class="inner" d="${d}" stroke="var(${COLORS[kind]})" marker-end="url(#m-${kind})"${dur ? ` style="animation-duration:${dur}"` : ''}/>`; }
+function T(x, y, s, cls = 'lbl', anchor = 'start') { return `<text class="${cls}" x="${x}" y="${y}" text-anchor="${anchor}">${s}</text>`; }
+function valveV(x, y) { return `<path d="M${x - 6} ${y - 8}L${x + 6} ${y + 8}H${x - 6}L${x + 6} ${y - 8}Z" style="fill:var(--surface);stroke:var(--fg2);stroke-width:1.4"/>`; }
+function dsh(x, y) { return `<g><circle cx="${x}" cy="${y}" r="7" style="fill:var(--surface);stroke:var(--flow-water);stroke-width:1.8"/><path d="M${x - 3} ${y - 3}L${x + 3} ${y + 3}M${x + 3} ${y - 3}L${x - 3} ${y + 3}" style="stroke:var(--flow-water);stroke-width:1.6"/></g>`; }
+function pump(x, y, r = 12) { return `<g><circle cx="${x}" cy="${y}" r="${r}" class="eq2"/><path d="M${x - r * .45} ${y - r * .55}L${x + r * .65} ${y}L${x - r * .45} ${y + r * .55}Z" style="fill:var(--fg2)"/></g>`; }
+function fan(x, y, r = 14) { return `<g><circle cx="${x}" cy="${y}" r="${r}" class="eq2"/><g class="spin" style="--spin:2.2s"><path d="M${x} ${y}L${x} ${y - r + 3}M${x} ${y}L${x + r * .8} ${y + r * .45}M${x} ${y}L${x - r * .8} ${y + r * .45}" style="stroke:var(--fg2);stroke-width:2.2;stroke-linecap:round"/></g></g>`; }
+function conn(x, y, dir = 'r', w = 16) { const h = 10; return dir === 'r' ? `<path class="conn" d="M${x} ${y - h / 2}H${x + w}L${x + w + 6} ${y}L${x + w} ${y + h / 2}H${x}Z"/>` : `<path class="conn" d="M${x} ${y - h / 2}H${x - w}L${x - w - 6} ${y}L${x - w} ${y + h / 2}H${x}Z"/>`; }
+const unitW = (u) => [...u].reduce((w, c) => w + (/[mMNW]/.test(c) ? 8 : 5.6), 0) + 4;
+
+/** Hộp số liệu nhiều dòng có đường dẫn tới điểm đo. rows: [nhãn, khoá]. Cột đơn vị co giãn theo đơn vị dài nhất. */
+function TAG(t) {
+  const w = t.w || 150, rh = 16, h = 20 + t.rows.length * rh + 4;
+  const uw = Math.max(...t.rows.map(([, k]) => unitW(S[k][1])));
+  const anyWarn = t.rows.some(([, k]) => isWarn(k));
+  const allMissing = t.rows.every(([, k]) => S[k][3] === 'A');
+  (TAG_KEYS[state.scene] ||= {})[t.id] = t.rows.map((r) => r[1]);
+  let lead = '';
+  if (t.a) {
+    const [ax, ay] = t.a; const cx = Math.max(t.x, Math.min(ax, t.x + w)); const cy = Math.max(t.y, Math.min(ay, t.y + h));
+    lead = `<path class="lead" d="M${cx} ${cy}L${ax} ${ay}"/><circle class="leaddot" cx="${ax}" cy="${ay}" r="2.6"/>`;
+  }
+  const rows = t.rows.map(([lab, k], i) => {
+    const m = S[k]; const y = t.y + 20 + (i + 1) * rh - 2; const v = valueOf(k);
+    const cls = m[3] === 'A' ? 'missing' : m[3] === 'F' ? 'fixed' : m[3] === 'P' ? 'proxy' : isWarn(k) ? 'warn' : '';
+    const txt = m[3] === 'A' ? 'không đo' : (m[3] === 'P' ? '≈ ' : '') + fmt(v, m[2]);
+    return `<text class="tl" x="${t.x + 8}" y="${y}">${lab}</text><text class="tv ${cls}" x="${t.x + w - 8 - (m[3] === 'A' ? 0 : uw)}" y="${y}" text-anchor="end">${txt}</text>${m[3] === 'A' ? '' : `<text class="tu" x="${t.x + w - 8}" y="${y}" text-anchor="end">${m[1]}</text>`}`;
+  }).join('');
+  const flag = anyWarn ? `<path class="flag" d="M${t.x + w - 18} ${t.y + 4}h14l-7 12z"/><text class="flagt" x="${t.x + w - 11}" y="${t.y + 14}" text-anchor="middle">!</text>` : '';
+  return `${lead}<g class="tag" tabindex="0" role="button" data-tag="${t.id}" data-warn="${anyWarn}" data-missing="${allMissing}" aria-label="${t.title}"><rect class="box" x="${t.x}" y="${t.y}" width="${w}" height="${h}" rx="5"/><text class="tt" x="${t.x + 8}" y="${t.y + 15}">${t.title}</text>${flag}${rows}</g>`;
+}
+
+/** Ô một giá trị đặt ngay trên đường ống (kiểu DCS). */
+function MINI(c) {
+  const m = S[c.key]; const uw = unitW(m[1]); const w = (c.prefix ? c.prefix.length * 5.6 + 12 : 6) + 40 + uw; const warn = isWarn(c.key);
+  (TAG_KEYS[state.scene] ||= {})[c.id] = [c.key];
+  return `<g class="tag" tabindex="0" role="button" data-tag="${c.id}" data-warn="${warn}" aria-label="${c.title}"><title>${c.title}</title><rect class="box" x="${c.x}" y="${c.y}" width="${w}" height="17" rx="4"/>${c.prefix ? `<text class="tl" x="${c.x + 5}" y="${c.y + 12.5}">${c.prefix}</text>` : ''}<text class="tv${warn ? ' warn' : ''}" x="${c.x + w - 3 - uw}" y="${c.y + 12.5}" text-anchor="end" style="font-size:11.5px">${fmt(valueOf(c.key), m[2])}</text><text class="tu" x="${c.x + w - 5}" y="${c.y + 12.5}" text-anchor="end">${m[1]}</text></g>`;
+}
+
+/* ================= LÒ HƠI ================= */
+function coilH(x1, x2, yTop, yBot, step, cls) {
+  let pts = [], y = yBot, left = true;
+  while (y >= yTop) { pts.push(left ? `${x1},${y} ${x2},${y}` : `${x2},${y} ${x1},${y}`); y -= step; left = !left; }
+  return `<polyline class="coil ${cls}" points="${pts.join(' ')}"/>`;
+}
+/** Cụm ống treo kiểu chữ U từ trần xuống. */
+function pend(x1, x2, yt, yb, cls, step = 6) {
+  let s = '';
+  for (let x = x1; x + 3 <= x2; x += step) s += `<path class="coil ${cls}" d="M${x} ${yt}V${yb}Q${x + 1.5} ${yb + 5} ${x + 3} ${yb}V${yt}" style="stroke-width:1.6"/>`;
+  return s;
+}
+function boilerSVG() {
+  /* Lò SG-995/17.5-M728 (Alstom thiết kế, SBWL chế tạo) theo bản vẽ P0200/P0001, 11,5 px/m theo chiều cao: ống góp dưới cốt 7,75 m
+     (y 760) tới trần cốt 60,075 m (y 159); bao hơi cốt 60,875 m. Buồng đốt dưới sâu 17,678 m (x 251–454), buồng đốt trên khoảng 9 m
+     (x 300–404); vai lò từ cốt 29,75 m (y 507) tới cốt 33,85 m (y 460). Đuôi lò một đường khói sâu 9 m (x 470–574), đáy bộ hâm cốt
+     43,65 m (y 350), phễu tro đuôi lò xuống cốt khoảng 36,85 m (y 425). Mũi khí động lấy theo bản vẽ, không có kích thước. */
+  const burnersF = [264, 277, 290], burnersR = [414, 427, 440];
+  const archF = (x) => 507 - (x - 251) * 47 / 49, archR = (x) => 460 + (x - 404) * 47 / 50;
+  const burner = (x, yEnd) => `<rect class="eq2" x="${x - 4}" y="432" width="8" height="${yEnd - 432}" rx="2"/><circle cx="${x}" cy="436" r="5" class="eq2"/>`;
+  const flame = (x, y, sx) => `<path class="flicker" d="M${x - 4} ${y}Q${x + sx * 4} ${y + 62} ${x + sx * 22} ${y + 100}Q${x + sx * 2} ${y + 62} ${x + 4} ${y}Z" style="fill:var(--flame);opacity:.9"/>`;
+  const pcSystem = (x0, n) => `
+    <rect class="eq2" x="${x0}" y="900" width="78" height="26" rx="13"/>${T(x0 + 39, 917, 'Nghiền ' + n, 'xs', 'middle')}
+    <path class="eq2" d="M${x0 + 96} 852H${x0 + 126}L${x0 + 111} 876Z"/>
+    <rect class="eq2" x="${x0 + 140}" y="848" width="74" height="30" rx="3"/>${T(x0 + 177, 867, 'Kho bột ' + n, 'sm in', 'middle')}
+    ${[0, 1, 2, 3, 4, 5, 6, 7].map((i) => `<rect class="eq2" x="${x0 + 132 + i * 11}" y="886" width="8" height="8" rx="1"/>`).join('')}
+    ${fan(x0 + 111, 914, 9)}
+    ${P(`M${x0 + 39} 900V880H${x0 + 98}`, 'coal', { thin: true, noHalo: true })}${P(`M${x0 + 126} 862H${x0 + 138}`, 'coal', { thin: true, noHalo: true })}`;
+  const tags = [
+    { id: 'ms', title: 'Hơi quá nhiệt ra lò', x: 640, y: 120, w: 166, a: [700, 40], rows: [['G hơi', 'BOILER_STEAM_FLOW'], ['p hơi', 'BOILER_STEAM_PRESSURE'], ['t hơi', 'BOILER_STEAM_TEMP']] },
+    { id: 'hrh', title: 'Tái nhiệt nóng ra lò', x: 818, y: 120, w: 160, a: [870, 58], rows: [['p hơi', 'HRH_PRESSURE'], ['t hơi', 'BOILER_REHEAT_TEMP']] },
+    { id: 'crh', title: 'Tái nhiệt lạnh vào lò', x: 990, y: 120, w: 160, a: [1040, 76], rows: [['p hơi', 'CRH_PRESSURE'], ['t hơi', 'CRH_TEMP']] },
+    { id: 'rhs', title: 'Phun giảm ôn tái nhiệt', x: 1164, y: 132, w: 172, a: [1146, 92], rows: [['G phun', 'RH_SPRAY_FLOW'], ['p phun', 'RH_SPRAY_PRESSURE'], ['t phun', 'RH_SPRAY_TEMP']] },
+    { id: 'shs', title: 'Phun giảm ôn quá nhiệt', x: 820, y: 196, w: 166, a: [480, 128], rows: [['G cấp 1 + 2', 'SH_SPRAY_FLOW'], ['p phun', 'SH_SPRAY_PRESSURE'], ['t phun', 'SH_SPRAY_TEMP']] },
+    { id: 'gin', title: 'Khói vào bộ sấy', x: 640, y: 362, w: 150, a: [700, 455], rows: [['t khói', 'GAS_IN_TEMP'], ['O₂', 'O2_IN']] },
+    { id: 'eco', title: 'Nước cấp vào bộ hâm', x: 1000, y: 362, w: 160, a: [1060, 344], rows: [['G nước', 'ECO_FW_FLOW'], ['t nước', 'ECO_FW_TEMP']] },
+    { id: 'gout', title: 'Khói ra bộ sấy', x: 920, y: 590, w: 150, a: [876, 704], rows: [['t khói', 'GAS_OUT_TEMP'], ['O₂', 'O2_OUT']] },
+    { id: 'sa', title: 'Gió cấp 2', x: 612, y: 552, w: 160, a: [700, 540], rows: [['t vào bộ sấy', 'SA_IN_TEMP'], ['t ra bộ sấy', 'SA_OUT_TEMP'], ['G gió', 'SA_FLOW']] },
+    { id: 'pa', title: 'Gió cấp 1', x: 612, y: 632, w: 160, a: [600, 700], rows: [['t vào bộ sấy', 'PA_IN_TEMP'], ['t ra bộ sấy', 'PA_OUT_TEMP'], ['G gió', 'PA_FLOW']] },
+    { id: 'amb', title: 'Không khí ngoài trời', x: 612, y: 798, w: 160, a: [664, 776], rows: [['t môi trường', 'AMBIENT_TEMP'], ['độ ẩm', 'HUMIDITY'], ['p khí quyển', 'ATM_PRESSURE']] },
+    { id: 'coal', title: 'Than cấp lò', x: 12, y: 590, w: 170, rows: [['than DCS', 'COAL_DCS'], ['nhiệt trị cao', 'COAL_QC'], ['độ ẩm', 'COAL_W'], ['chất bốc', 'COAL_V'], ['độ tro', 'COAL_A']] },
+    { id: 'ba', title: 'Xỉ đáy', x: 372, y: 752, w: 132, a: [352, 772], rows: [['chất cháy', 'BOTTOM_ASH_COMBUSTIBLE']] },
+    { id: 'fa', title: 'Tro bay (ESP)', x: 950, y: 808, w: 140, a: [1010, 792], rows: [['chất cháy', 'FLY_ASH_COMBUSTIBLE']] },
+  ];
+  return `<svg viewBox="0 0 1500 980" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Sơ đồ HMI lò hơi Quảng Ninh"><defs>${markers()}</defs>
+  <!-- buồng góp trên đỉnh -->
+  <rect x="236" y="92" width="352" height="67" rx="2" style="fill:none;stroke:var(--equip-stroke);stroke-width:1;stroke-dasharray:3 4"/>
+  <!-- hộp gió hai vai lò (gió cấp 2 qua 34 cửa) và gió cấp 3 trên tường đứng dưới vai (64 cửa) -->
+  <rect x="214" y="440" width="280" height="172" rx="4" style="fill:var(--equip-2);stroke:var(--equip-stroke);stroke-width:1.2;opacity:.75"/>
+  <!-- vỏ lò: buồng đốt W-flame + mũi khí động + đuôi lò một đường khói có phễu tro -->
+  <path class="eq" d="M300 159H574V350L540 425H504L470 350V270L404 330V460L454 507V631L362 760H342L251 631V507L300 460Z"/>
+  <!-- tái nhiệt cấp thấp kiểu tường: tường trước 267 ống, hai tường bên 2 × 148 ống -->
+  <path class="coil rh" d="M304 166V372M308 166V372" style="stroke-width:2"/>
+  <rect class="hdr" x="296" y="370" width="16" height="5" rx="2"/>
+  <!-- quá nhiệt trần; quá nhiệt cấp 2 (I.T.S, 19 tấm mành); tái nhiệt cấp cao (H.T.R, 59 dàn); quá nhiệt cấp 3 (H.T.S, 119 dàn) -->
+  <path class="coil hot" d="M312 164H572"/>
+  ${pend(318, 362, 170, 322, 'hot', 9)}
+  ${pend(372, 398, 170, 296, 'rh')}
+  ${pend(410, 446, 170, 280, 'hot')}
+  <!-- đuôi lò: quá nhiệt cấp 1 phần treo (L.T.S2) và phần nằm ngang (L.T.S1), rồi bộ hâm -->
+  ${pend(478, 566, 172, 232, 'hot', 8)}
+  ${coilH(478, 566, 242, 304, 8, 'hot')}
+  <rect class="hdr" x="474" y="308" width="96" height="5" rx="2"/><rect class="hdr" x="474" y="316" width="96" height="5" rx="2"/>
+  ${coilH(478, 566, 326, 340, 7, 'eco')}
+  <rect class="hdr" x="474" y="342" width="96" height="5" rx="2"/>
+  <!-- ống khói từ phễu đuôi lò → bộ sấy quay (đặt ngay dưới đuôi lò, cốt 15,4–19 m) -->
+  <path d="M504 425H540V440H900V560H852V470H504Z" style="fill:var(--equip)"/><path class="eqline" d="M504 425V470H852V560M900 560V440H540V425"/>
+  <!-- bao hơi Ø1775 và 3 bơm tuần hoàn cưỡng bức (2 chạy ở BMCR) -->
+  <circle class="eq2" cx="262" cy="140" r="12"/><path d="M252 142H272" style="stroke:var(--flow-water);stroke-width:2"/>
+  ${pump(232, 702, 10)}
+  ${burnersF.map((x) => burner(x, archF(x))).join('')}${burnersR.map((x) => burner(x, archR(x))).join('')}
+  <!-- bộ sấy không khí quay 3 khoang -->
+  <rect class="eq" x="780" y="560" width="120" height="120" rx="8"/>
+  <path class="eqline" d="M826 564V676M852 564V676"/>
+  <text class="xs" transform="translate(806 640) rotate(-90)" text-anchor="middle">GIÓ CẤP 2</text>
+  <text class="xs" transform="translate(842 640) rotate(-90)" text-anchor="middle">GIÓ CẤP 1</text>
+  <text class="xs" transform="translate(880 640) rotate(-90)" text-anchor="middle">KHÓI</text>
+  <!-- quạt gió chính, quạt gió cấp 1, bộ sấy gió bằng hơi trên cả hai đường -->
+  ${fan(720, 776)}<rect class="eq2" x="792" y="732" width="22" height="16" rx="2"/><path d="M796 736h14M796 740h14M796 744h14" style="stroke:var(--flow-steam);stroke-width:1"/>
+  ${fan(839, 920)}<rect class="eq2" x="828" y="864" width="22" height="16" rx="2"/><path d="M832 868h14M832 872h14M832 876h14" style="stroke:var(--flow-steam);stroke-width:1"/>
+  <!-- chế biến than bột gián tiếp: 2 máy nghiền bi, mỗi máy một kho than bột và 8 máy cấp than bột -->
+  <rect class="eq" x="20" y="800" width="462" height="140" rx="8"/>
+  ${pcSystem(30, 'A')}${pcSystem(256, 'B')}
+  <!-- lọc bụi, quạt khói, FGD + GGH, ống khói -->
+  <rect class="eq" x="950" y="700" width="128" height="70" rx="4"/>
+  ${[966, 994, 1022, 1050].map((x) => `<path class="eq" d="M${x - 10} 770H${x + 10}L${x + 4} 792H${x - 4}Z"/>`).join('')}
+  ${fan(1118, 735, 16)}
+  <rect class="eq" x="1168" y="600" width="54" height="182" rx="6"/>
+  <rect class="eq2" x="1234" y="640" width="30" height="40" rx="4"/>
+  <path class="eq" d="M1286 782L1294 380H1326L1334 782Z"/>
+
+  <!-- ===== dòng trong thiết bị ===== -->
+  ${F('M352 600V200H462', 'gasHot', '1.6s')}
+  ${F('M522 176V420', 'gas')}
+  ${F('M522 430V455H876V552', 'gasCool')}${F('M876 566V674', 'gasCool')}
+  ${flame(277, archF(277), 1)}${flame(290, archF(290), 1)}${flame(427, archR(427), -1)}${flame(414, archR(414), -1)}
+  ${F('M222 560H250', 'airHot')}${F('M222 596H250', 'airHot')}${F('M486 560H456', 'airHot')}${F('M486 596H456', 'airHot')}
+  ${F('M314 165H570V304', 'steam')}
+
+  <!-- ===== đường ống: nước, hơi quá nhiệt ===== -->
+  <!-- bao hơi → ống xuống → 3 bơm tuần hoàn → ống góp dưới; tường nước → bao hơi; bộ hâm → bao hơi -->
+  ${P('M250 140H232V690', 'water')}${P('M232 714V748H340', 'water')}
+  ${P('M296 159V140H275', 'water', { dur: '3s' })}
+  ${P('M576 318H594V26H256V128', 'water')}
+  ${P('M1490 344H576', 'water')}
+  <!-- bao hơi → QN trần → vách bao đuôi lò → QN cấp 1 (L.T.S1 → L.T.S2) → phun 1 → QN cấp 2 (mành) → phun 2 → QN cấp 3 → hơi chính -->
+  ${P('M268 128V112H320V162', 'steam')}
+  ${P('M540 172V128H338V168', 'steam')}
+  ${P('M354 168V100H420V168', 'steam')}
+  ${P('M440 168V40H1490', 'steam', { dur: '1.8s' })}
+  <!-- tái nhiệt: TN lạnh (phun) → TN cấp thấp trên tường trước và hai tường bên → TN cấp cao (treo) → TN nóng -->
+  ${P('M1490 76H220V372H294', 'rh')}
+  ${P('M306 160V150H378V168', 'rh')}
+  ${P('M394 168V58H1490', 'rh', { dur: '1.8s' })}
+  <!-- nước phun -->
+  ${P('M480 104V121', 'water', { thin: true, noHalo: true })}${P('M387 80V93', 'water', { thin: true, noHalo: true })}${P('M1146 96V83', 'water', { thin: true, noHalo: true })}
+  ${dsh(480, 128)}${dsh(387, 100)}${dsh(1146, 76)}
+
+  <!-- ===== gió và khói ===== -->
+  ${P('M803 560V540H496', 'airHot')}
+  ${P('M839 560V528H600V822H484', 'airHot')}
+  ${P('M664 776H803V682', 'airCold')}
+  ${P('M839 906V682', 'airCold')}
+  ${P('M876 680V735H948', 'gasCool')}
+  ${P('M1078 735H1100', 'gasCool', { noArrow: true })}${P('M1134 735H1166', 'gasCool')}
+  ${P('M1195 600V568H1286', 'gasCool')}${F('M1310 560V390', 'gasCool', '3s')}
+  ${P('M277 412V432', 'coal', { still: true })}${P('M427 412V432', 'coal', { still: true })}
+  ${P('M300 640H196V800', 'gasHot', { thin: true })}
+  ${[69, 295].map((x) => P(`M${x} 960V928`, 'coal', { thin: true, noHalo: true })).join('')}
+  ${P('M352 760V786', 'ash', { thin: true, noHalo: true })}
+
+  <!-- ===== nhãn thiết bị ===== -->
+  ${T(352, 676, 'Buồng đốt W-flame', 'lbl in', 'middle')}
+  ${T(352, 692, '16 vòi cyclone kép · 8 mỗi vai', 'sm in', 'middle')}
+  ${T(340, 338, 'QN cấp 2', 'sm in', 'middle')}${T(385, 310, 'TN cao', 'xs', 'middle')}${T(428, 294, 'QN cấp 3', 'xs', 'middle')}
+  ${T(314, 388, 'TN thấp (tường)', 'xs')}
+  ${T(322, 474, 'vai lò', 'sm in', 'middle')}
+  ${T(352, 628, 'gió cấp 3: 64 cửa trên tường đứng', 'xs', 'middle')}
+  ${T(622, 214, 'Đuôi lò một đường khói (9 m)', 'sm')}
+  ${T(622, 228, 'QN cấp 1 treo + nằm ngang, bộ hâm', 'xs')}
+  ${T(560, 404, 'phễu tro', 'xs')}
+  ${T(380, 92, 'phun 2', 'xs')}${T(488, 116, 'phun 1', 'xs')}
+  ${T(214, 300, '6 ống xuống', 'xs', 'end')}
+  ${T(222, 706, 'BCP ×3', 'sm', 'end')}${T(222, 720, '2 chạy ở BMCR', 'xs', 'end')}
+  ${T(906, 552, '2 × bộ sấy KK quay 3 khoang', 'sm')}
+  ${T(720, 754, '2 × quạt gió chính', 'sm', 'middle')}${T(818, 728, 'sấy gió bằng hơi', 'xs')}
+  ${T(856, 950, '2 × quạt gió cấp 1', 'sm')}${T(854, 876, 'sấy gió bằng hơi', 'xs')}
+  ${T(30, 816, 'Chế biến than bột gián tiếp: 2 máy nghiền bi BBI4796, 2 kho than bột 1100 m³, 16 máy cấp than bột', 'sm in')}
+  ${T(30, 832, 'quạt tải than bột sấy bằng gió nóng và khói lấy ở phễu lạnh; khí thừa qua túi lọc, quạt xả vent', 'xs')}
+  ${T(190, 790, 'khói phễu lạnh → sấy than', 'xs', 'end')}
+  ${T(1014, 692, 'Lọc bụi tĩnh điện', 'sm', 'middle')}
+  ${T(1118, 766, 'Quạt khói ×2', 'sm', 'middle')}
+  ${T(1195, 592, 'FGD', 'sm', 'middle')}${T(1249, 632, 'GGH', 'xs', 'middle')}
+  ${T(1310, 372, 'Ống khói 200 m', 'sm', 'middle')}
+  ${T(1486, 34, 'Hơi chính → tua bin', 'sm', 'end')}
+  ${T(1486, 52, 'Tái nhiệt nóng → IP', 'sm', 'end')}
+  ${T(1486, 70, '← Tái nhiệt lạnh từ thoát HP', 'sm', 'end')}
+  ${T(1486, 338, '← Nước cấp sau GNC8', 'sm', 'end')}
+  ${T(600, 20, 'nước bộ hâm → bao hơi', 'xs')}
+  ${T(500, 532, 'gió cấp 2 → hộp gió', 'xs')}
+
+  ${tags.map(TAG).join('')}
+  </svg>`;
+}
+
+/* ================= TUA BIN ================= */
+function turbineSVG() {
+  /* Bố cục ngang theo sơ đồ nhiệt chi tiết tổ máy 300 MW: lò hơi bên trái, HP, IP, một thân LP hai dòng và máy phát phía trên,
+     chuỗi gia nhiệt một hàng ở đáy (GNC8, GNC7, GNC6, khử khí, GNH4–GNH1), hơi trích thả thẳng xuống. Sơ đồ không có số thiết kế. */
+  const chip = (id, title, x, y, rows, w = 112) => TAG({ id, title, x, y, w, rows });
+  const tags = [
+    { id: 'tms', title: 'Hơi chính vào HP', x: 164, y: 84, w: 134, a: [200, 40], rows: [['G hơi', 'TURBINE_STEAM_FLOW'], ['p hơi', 'TURBINE_STEAM_PRESSURE'], ['t hơi', 'TURBINE_STEAM_TEMP']] },
+    { id: 'crh', title: 'Thoát HP → tái nhiệt', x: 164, y: 168, w: 140, a: [230, 315], rows: [['p hơi', 'CRH_PRESSURE'], ['t hơi', 'CRH_TEMP']] },
+    { id: 'hrh', title: 'Tái nhiệt nóng vào IP', x: 486, y: 40, w: 150, a: [480, 100], rows: [['p hơi', 'HRH_PRESSURE'], ['t hơi', 'HRH_TEMP']] },
+    { id: 'aux', title: 'Hơi tự dùng', x: 64, y: 392, w: 150, rows: [['G hơi', 'AUX_STEAM_FLOW'], ['p hơi', 'AUX_STEAM_PRESSURE'], ['t hơi', 'AUX_STEAM_TEMP']] },
+    { id: 'fw', title: 'Nước cấp → bộ hâm', x: 12, y: 692, w: 150, a: [60, 640], rows: [['G nước', 'FW_FLOW'], ['p nước', 'FW_PRESSURE'], ['t nước', 'FW_TEMP']] },
+    { id: 'gen', title: 'Máy phát', x: 1100, y: 140, w: 170, a: [1072, 220], rows: [['P đầu cực', 'PG']] },
+    { id: 'cond', title: 'Bình ngưng', x: 1305, y: 420, w: 140, rows: [['p ngưng', 'CONDENSER_PRESSURE']] },
+    { id: 'cw', title: 'Nước tuần hoàn', x: 1100, y: 372, w: 150, a: [1258, 410], rows: [['t vào', 'CW_IN_TEMP'], ['t ra', 'CW_OUT_TEMP']] },
+    { id: 'mk', title: 'Nước bổ sung', x: 1100, y: 436, w: 150, a: [1258, 440], rows: [['G nước', 'MAKEUP_FLOW'], ['t nước', 'MAKEUP_TEMP']] },
+    { id: 'h8', title: 'GNC8', x: 168, y: 692, w: 140, a: [213, 638], rows: [['t nước vào', 'GNC8.FW_IN'], ['t nước ra', 'GNC8.FW_OUT'], ['t nước đọng', 'GNC8.DRAIN']] },
+    { id: 'h7', title: 'GNC7 (bảng đảo vào/ra)', x: 318, y: 692, w: 170, a: [333, 638], rows: [['t "vào"', 'GNC7.FW_IN'], ['t "ra"', 'GNC7.FW_OUT'], ['t nước đọng', 'GNC7.DRAIN']] },
+  ];
+  const chips = [
+    chip('e1', 'Trích 1 · GNC8', 250, 440, [['p', 'GNC8.EXT_P'], ['t', 'GNC8.EXT_T']]),
+    chip('e2', 'Trích 2 · GNC7', 100, 474, [['p', 'GNC7.EXT_P'], ['t', 'GNC7.EXT_T']], 110),
+  ];
+  const heater = (x, name) => `<rect class="eq2" x="${x}" y="602" width="66" height="36" rx="18"/><text class="lbl in" x="${x + 33}" y="625" text-anchor="middle" style="fill:var(--fg)">${name}</text>`;
+  const c = 820;
+  return `<svg viewBox="0 0 1500 800" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Sơ đồ HMI tua bin Quảng Ninh"><defs>${markers()}
+    <pattern id="shaftp" width="12" height="12" patternUnits="userSpaceOnUse"><rect width="6" height="12" style="fill:var(--equip-stroke)" opacity=".5"/></pattern></defs>
+  <!-- lò hơi: quá nhiệt (trái), tái nhiệt (phải) -->
+  <rect class="eq" x="30" y="120" width="122" height="210" rx="4"/>
+  <path class="coil hot" d="M60 150l-14 12 28 12-28 12 28 12-28 12 28 12-28 12 28 12-14 12" style="opacity:.8"/>
+  <path class="coil rh" d="M130 140l-14 12 28 12-28 12 28 12-28 12 28 12-28 12 28 12-28 12 28 12-14 12" style="opacity:.8"/>
+  ${T(91, 316, 'Lò hơi', 'lbl in', 'middle')}${T(60, 146, 'QN', 'xs', 'middle')}${T(130, 136, 'TN', 'xs', 'middle')}
+  <!-- trục, HP, IP, một thân LP hai dòng, máy phát -->
+  <rect x="300" y="244" width="700" height="12" style="fill:var(--equip-2)"/><rect x="300" y="244" width="700" height="12" fill="url(#shaftp)" opacity=".7"/>
+  <path class="eq" d="M300 195L420 215V285L300 305Z"/>
+  <path class="eq" d="M470 225L600 198V302L470 275Z"/>
+  <path class="eq" d="M${c} 212L${c - 100} 172V328L${c} 288Z"/><path class="eq" d="M${c} 212L${c + 100} 172V328L${c} 288Z"/>
+  <circle class="eq" cx="1040" cy="250" r="45"/>
+  ${T(360, 255, 'HP', 'casing', 'middle')}${T(535, 255, 'IP', 'casing', 'middle')}${T(c, 255, 'LP', 'casing', 'middle')}${T(1040, 255, 'G', 'casing', 'middle')}
+  ${T(360, 272, '1 + 10 tầng', 'xs', 'middle')}${T(535, 210, '12 tầng', 'xs', 'middle')}${T(708, 164, '2 × 5 tầng', 'xs', 'middle')}
+  ${T(1040, 314, '353 MVA · 20 kV', 'xs', 'middle')}
+  <!-- bình ngưng -->
+  <rect class="eq" x="1290" y="390" width="170" height="100" rx="6"/>
+  <rect class="eq2" x="1335" y="490" width="80" height="18" rx="6"/>
+  ${T(1375, 404, 'Bình ngưng', 'sm in', 'middle')}${T(1375, 502, 'giếng nóng', 'xs', 'middle')}
+  ${[1350, 1400].map((x) => `<path class="eqline" d="M${x} 524V534M${x} 556V568"/>${pump(x, 545, 11)}`).join('')}
+  <path class="eqline" d="M1350 524H1400M1350 568H1400"/>
+  ${T(1332, 548, '2 × bơm ngưng', 'xs', 'end')}
+  <!-- gia nhiệt cao áp, khử khí, 3 bơm cấp kèm bơm tăng áp -->
+  ${heater(180, 'GNC8')}${heater(300, 'GNC7')}${heater(420, 'GNC6')}
+  <rect class="eq" x="660" y="560" width="120" height="40" rx="18"/><rect class="eq2" x="690" y="540" width="60" height="20" rx="8"/>
+  ${T(720, 585, 'BKK', 'lbl in', 'middle')}
+  <path class="eqline" d="M680 630H760M680 674H760"/>
+  ${[680, 720, 760].map((x) => `<path class="eqline" d="M${x} 630V640M${x} 664V674"/>${pump(x, 652)}`).join('')}
+  <path class="eqline" d="M600 600V620"/><path class="eqline" d="M720 600V630"/>
+  ${T(776, 650, '3 bơm cấp A, B, C', 'xs')}${T(776, 661, 'mỗi bơm có bơm tăng áp', 'xs')}
+  <!-- gia nhiệt hạ áp, bình ngưng hơi chèn -->
+  ${heater(900, 'GNH4')}${heater(1000, 'GNH3')}${heater(1100, 'GNH2')}${heater(1200, 'GNH1')}
+  <rect class="eq2" x="1300" y="606" width="66" height="28" rx="6"/>${T(1333, 652, 'BN hơi chèn', 'xs', 'middle')}
+
+  <!-- ===== đường ống ===== -->
+  ${P('M130 120V70H480V232', 'rh', { dur: '1.8s' })}
+  ${P('M60 120V40H435V235H422', 'steam', { dur: '1.8s' })}
+  ${P('M304 300V315H154', 'rh', { dur: '1.8s' })}
+  ${P('M594 200V148H820V208', 'steam', { dur: '2s' })}
+  ${P('M910 324V350H1375V388', 'steam', { dur: '2s' })}
+  ${P('M376 292V540H213V600', 'steam')}
+  ${P('M240 315V500H333V600', 'rh')}
+  ${P('M190 315V390', 'rh', { thin: true })}
+  ${P('M520 283V560H453V600', 'steam')}
+  ${P('M595 301V520H720V538', 'steam')}
+  ${P('M800 300V570H933V600', 'steam')}
+  ${P('M770 312V550H1033V600', 'steam')}
+  ${P('M850 304V530H1133V600', 'steam')}
+  ${P('M880 316V510H1233V600', 'steam')}
+  ${P('M680 674H636V620H488', 'water')}
+  ${P('M420 620H368', 'water', { noHalo: true })}${P('M300 620H248', 'water', { noHalo: true })}
+  ${P('M180 620H60V332', 'water', { dur: '2s' })}
+  ${P('M1375 508V522', 'water')}
+  ${P('M1400 568H1484V620H1368', 'water')}
+  ${P('M1300 620H1268', 'water', { noHalo: true })}${P('M1200 620H1168', 'water', { noHalo: true })}
+  ${P('M1100 620H1068', 'water', { noHalo: true })}${P('M1000 620H968', 'water', { noHalo: true })}
+  ${P('M900 620H820V580H782', 'water')}
+  ${P('M213 638V654H320V640', 'water', { thin: true })}
+  ${P('M333 638V658H440V640', 'water', { thin: true })}
+  ${P('M453 638V668H648V580H658', 'water', { thin: true })}
+  ${P('M933 638V654H1020V640', 'water', { thin: true })}
+  ${P('M1033 638V656H1120V640', 'water', { thin: true })}
+  ${P('M1133 638V658H1220V640', 'water', { thin: true })}
+  ${P('M1233 638V690H1276', 'water', { thin: true })}
+  ${P('M1258 470H1288', 'cw')}${P('M1288 410H1258', 'cw')}${P('M1258 440H1288', 'water', { thin: true, noHalo: true })}
+  ${valveV(435, 100)}${valveV(435, 128)}${valveV(480, 118)}${valveV(480, 150)}
+  ${conn(1276, 690, 'r', 0)}
+
+  <!-- ===== nhãn ===== -->
+  ${T(428, 104, 'van chặn', 'xs', 'end')}${T(428, 132, 'van ĐC', 'xs', 'end')}${T(488, 122, 'van chặn IP', 'xs')}${T(488, 154, 'van ĐC IP', 'xs')}
+  ${T(166, 34, 'Hơi chính → HP', 'sm')}${T(166, 64, 'Tái nhiệt nóng → IP', 'sm')}${T(170, 309, 'Tái nhiệt lạnh → lò', 'sm')}
+  ${T(640, 142, 'ống chuyển IP → LP', 'xs')}
+  ${T(1282, 704, '→ bình ngưng', 'xs')}
+  ${T(500, 600, 'đọng dồn cấp → BKK', 'xs')}
+  ${T(392, 400, 'trích 3 · GNC6', 'xs')}${T(392, 411, 'chưa có điểm đo', 'xs')}
+  ${T(604, 430, 'trích 4 · BKK', 'xs')}${T(604, 441, 'chưa có điểm đo', 'xs')}
+  ${T(860, 565, 'trích 5 → GNH4', 'xs')}${T(960, 545, 'trích 6 → GNH3', 'xs')}
+  ${T(1060, 525, 'trích 7 → GNH2', 'xs')}${T(1160, 505, 'trích 8 → GNH1', 'xs')}
+  ${T(892, 470, 'trích 5–8: chưa có điểm đo', 'xs')}
+  ${T(1150, 682, 'GNH2, GNH1 đặt ở cổ bình ngưng', 'xs', 'middle')}
+  ${T(1060, 708, 'đọng hạ áp dồn cấp GNH4 → GNH1 → bình ngưng', 'xs', 'middle')}
+  ${T(1090, 340, 'hơi thoát LP → bình ngưng', 'xs')}
+
+  ${tags.map(TAG).join('')}${chips.join('')}
+  </svg>`;
+}
+
+/* ---------- Bảng phụ ---------- */
+function kv(rows) { return `<table class="kv">${rows.map(([a, b, c]) => `<tr><td>${a}${c ? `<div class="muted">${c}</div>` : ''}</td><td>${b}</td></tr>`).join('')}</table>`; }
+const setName = () => `${SETS[dsOf()].unit} · ${SETS[dsOf()].ca} (${SETS[dsOf()].date})`;
+function sideBoiler() {
+  const names = { L1: 'L1 · khói khô', L2: 'L2 · carbon chưa cháy hết', L3: 'L3 · H₂ trong nhiên liệu', L4: 'L4 · ẩm trong nhiên liệu', L5: 'L5 · ẩm trong không khí', L6: 'L6 · cháy tạo CO', L7: 'L7 · toả ra môi trường', L9: 'L9 · tổn thất khác' };
+  return `<div class="panel card"><h2>Hiệu suất lò · ${setName()}</h2>${kv([['η lò hơi', fmt(exOf('etaB'), 2) + ' %'], ['Σ tổn thất', fmt(exOf('sumL'), 2) + ' %'], ...Object.keys(names).map((k) => [names[k], fmt(exOf(k), 2) + ' %']),
+    ['Than tính ngược', fmt(exOf('coalCalc'), 2) + ' t/h', 'DCS: ' + fmt(exOf('coalDcs'), 2) + ' t/h']])}
+    <p class="src">Kết quả tính trong Bảng 4-2 của báo cáo khảo sát (theo QĐ 1327); L8 (đá vôi) không áp dụng. L2 lớn (3,8–4,7 %) do than antraxit chất bốc thấp.</p></div>
+  <div class="panel card"><h2>Lò hơi theo khảo sát và bản vẽ Alstom</h2>${kv([
+    ['Kiểu', 'SG-995/17.5-M728', 'Alstom thiết kế, SBWL (Thượng Hải) chế tạo; W-flame hai vai, bao hơi, tuần hoàn có bơm hỗ trợ, tái nhiệt một cấp, gần tới hạn'],
+    ['Định mức', 'BMCR 995 t/h', 'RO 889,1 t/h; 17,29 / 17,13 MPa(g); 541 °C; tái nhiệt 882,5 / 736,4 t/h, 3,53 → 3,34 MPa(g), 320 → 540 °C; nước cấp 281 / 273 °C'],
+    ['Buồng đốt', '15,3 m rộng', 'phần dưới sâu 17,678 m, phần trên khoảng 9 m; vai lò cốt 29,75–33,85 m; trần cốt 60,075 m; bao hơi Ø1775 ở cốt 60,875 m'],
+    ['Tuần hoàn', '3 bơm Hayward Tyler', '2 chạy ở BMCR, 2182 m³/h mỗi bơm; 6 ống xuống Ø323,9'],
+    ['Vòi đốt', '16 vòi cyclone kép', '8 vòi mỗi vai, 32 miệng than bột; 16 vòi dầu (30 % BMCR); gió cấp 2: 34 cửa trên vai, 64 cửa gió cấp 3 trên tường đứng'],
+    ['Nghiền than', '2 máy nghiền bi', 'BBI4796, 70 % mỗi máy; đốt gián tiếp qua 2 kho than bột 1100 m³ và 16 máy cấp than bột SGF-13'],
+    ['Quạt', '2 FD · 2 PA · 2 ID', 'FD hướng trục 1250 kW, PA ly tâm 400 kW, ID hướng trục 1500 kW; bộ sấy gió bằng hơi trên cả gió cấp 1 và cấp 2'],
+    ['Khói', '2 APH · ESP · FGD', 'bộ sấy quay 3 khoang Ø10 318 mm đặt dưới đuôi lò; không có SCR; FGD đá vôi có GGH; ống khói 200 m'],
+  ])}<p class="src">Nguồn: khảo sát mục 3.1.1–3.1.2, Bảng 3-1, 3-9 đến 3-16; bản vẽ Alstom P0200 và P0001.</p></div>
+  <div class="panel card"><h2>Bố trí bề mặt nhiệt (theo bản vẽ Alstom)</h2><ul class="notes">
+    <li><b>Quá nhiệt:</b> trần → vách bao đuôi lò → QN cấp 1 (L.T.S1 nằm ngang, L.T.S2 treo ở đầu đuôi lò) → phun 1 → QN cấp 2 (I.T.S, 19 tấm mành) → phun 2 → QN cấp 3 (H.T.S, 119 dàn) ở cửa ra buồng đốt.</li>
+    <li><b>Tái nhiệt:</b> tái nhiệt lạnh qua phun giảm ôn → tái nhiệt cấp thấp kiểu tường (tường trước 267 ống, hai tường bên 2 × 148 ống) → tái nhiệt cấp cao treo (H.T.R, 59 dàn).</li>
+    <li><b>Đuôi lò một đường khói</b> sâu 9 m: QN cấp 1 rồi bộ hâm (149 dàn); khói xuống bộ sấy quay ngay dưới đuôi lò.</li>
+  </ul></div>
+  <div class="panel card"><h2>Còn cần xác nhận</h2><ul class="notes">
+    <li>Khảo sát mô tả đuôi lò chia hai nhánh với tái nhiệt nằm ngang ở một nhánh, nhưng bản vẽ Alstom P0200 cho thấy một đường khói duy nhất và tái nhiệt đặt trên tường buồng đốt. Sơ đồ vẽ theo bản vẽ Alstom.</li>
+    <li>Tổ 3 ca 1: các số lò hơi trùng khít tổ 2 ca 1 (⚠).</li>
+    <li>Độ ẩm 80 %, áp suất khí quyển 101 800 Pa và chất cháy trong xỉ 12 % giống nhau ở cả 6 ca (⚠).</li>
+    <li>Khảo sát vừa ghi 16 vòi đốt (8 mỗi vai), vừa ghi 32 vòi than bột; sơ đồ hiểu là 16 vòi cyclone kép, mỗi vòi 2 miệng.</li>
+  </ul></div>`;
+}
+function sideTurbine() {
+  return `<div class="panel card"><h2>Hiệu suất tua bin · ${setName()}</h2>${kv([
+    ['Suất hao nhiệt HR', fmt(exOf('HR'), 0) + ' kJ/kWh'], ['HR hiệu chỉnh', fmt(exOf('HRcorr'), 0) + ' kJ/kWh'],
+    ['η tua bin', fmt(exOf('etaTB'), 2) + ' %'], ['η tua bin hiệu chỉnh', fmt(exOf('etaTBcorr'), 2) + ' %'],
+    ['HR tổ máy thô', fmt(exOf('HRtho'), 0) + ' kJ/kWh'], ['HR tinh (nghịch / thuận)', fmt(exOf('HRnghich'), 0) + ' / ' + fmt(exOf('HRthuan'), 0)],
+    ['η tổ máy thô', fmt(exOf('etaTho'), 2) + ' %'], ['η tổ máy tinh', fmt(exOf('etaTinh'), 2) + ' %'],
+    ['Tỉ lệ tự dùng', fmt(exOf('ER'), 2) + ' %'],
+  ])}<p class="src">Kết quả tính trong Bảng 4-1 và 4-3 của báo cáo khảo sát. Tổ 2 ca 3: HR tinh thuận 12 328 cao hơn HR tinh nghịch 11 268 kJ/kWh vì than DCS (127,1 t/h) lớn hơn than tính ngược (116,1 t/h).</p></div>
+  <div class="panel card"><h2>Tua bin theo khảo sát</h2>${kv([
+    ['Kiểu', '300 MW, 170 kg/cm²', '538/538 °C; xung lực, tái nhiệt, đồng trục, 3 thân, LP hai dòng; 33 tầng cánh'],
+    ['Tầng cánh', 'HP 1 + 10', 'IP 12, LP 2 × 5; hơi trong HP đi từ gối 2 về gối 1'],
+    ['Gia nhiệt', '3 GNC + BKK + 4 GNH', 'GNC8, GNC7, GNC6 (khảo sát gọi GNC1, GNC2); GNH2 và GNH1 ở cổ bình ngưng; bình ngưng hơi chèn'],
+    ['Bơm', '3 bơm cấp', 'mỗi bơm có bơm tăng áp; 2 bơm ngưng; 3 bơm tuần hoàn nước biển'],
+    ['Máy phát', '353 MVA', '20 kV, 50 Hz, cos φ 0,85, kích từ tĩnh'],
+  ])}<p class="src">Nguồn: Bảng 1-1, Bảng 3-20 và sơ đồ nhiệt chi tiết. Không có sơ đồ cân bằng nhiệt thiết kế nên các ô không có số thiết kế cho cửa trích.</p></div>
+  <div class="panel card"><h2>Còn cần xác nhận</h2><ul class="notes">
+    <li>Bảng 4-3 đảo hai dòng nước vào/ra GNC7 ("GNC2") ở cả 6 ca (⚠).</li>
+    <li>Tổ 3 ca 2 và ca 3: áp suất nước phun quá nhiệt 7,1 và 6,0 MPa, thấp hơn áp suất hơi (⚠).</li>
+    <li>Hơi tự dùng có áp suất và nhiệt độ trùng hơi vào bộ tái nhiệt ở cả 6 ca; khảo sát không ghi điểm lấy hơi.</li>
+    <li>Chỉ GNC8 và GNC7 có số đo; GNC6, bình khử khí và 4 bình hạ áp không có. Nhiệt độ nước tuần hoàn ra không có.</li>
+    <li>Ca 1 (07/08/2024) và ca 2, 3 (08/03/2024) lấy ở hai ngày khác nhau, nên không tính trung bình.</li>
+  </ul></div>`;
+}
+function legend() {
+  const items = state.scene === 'boiler'
+    ? [['--flow-steam', 'Hơi quá nhiệt'], ['--flow-rh', 'Hơi tái nhiệt'], ['--flow-water', 'Nước cấp, nước lò, nước phun'], ['--flow-gas-hot', 'Khói nóng'], ['--flow-gas-cool', 'Khói sau bộ sấy'], ['--flow-air-hot', 'Gió nóng'], ['--flow-air-cold', 'Gió lạnh'], ['--flow-coal', 'Than', true]]
+    : [['--flow-steam', 'Hơi chính, hơi trích'], ['--flow-rh', 'Hơi tái nhiệt'], ['--flow-water', 'Nước cấp, nước ngưng'], ['--flow-cw', 'Nước tuần hoàn'], ['--flow-water', 'Nước đọng, nhánh phụ (nét mảnh)', true]];
+  return items.map(([c, t, d]) => `<span><i class="${d ? 'dash' : ''}" style="border-color:var(${c})"></i>${t}</span>`).join('') + '<span>Ô nét đứt: bảng khảo sát không có · ⚠ cần kiểm tra · cuộn chuột để thu phóng</span>';
+}
+
+/* ---------- Chi tiết điểm đo ---------- */
+const TAG_KEYS = {};
+function openTag(id) {
+  const svg = document.querySelector('#mimic svg');
+  const g = svg.querySelector(`[data-tag="${id}"]`);
+  const keys = TAG_KEYS[state.scene][id];
+  document.getElementById('dlgTitle').textContent = g.getAttribute('aria-label');
+  document.getElementById('dlgKey').textContent = keys.join(' · ');
+  document.getElementById('dlgBody').innerHTML = keys.map((k) => {
+    const m = S[k];
+    const per = m[3] === 'A' ? '' : perSets(k, m);
+    return `<div><b>${m[0]}</b><div class="src">${MODE_TEXT[m[3]]}${m[4] ? ' · ' + m[4] : ''}${m[3] === 'P' ? ' · theo ' + m[6] : ''}</div>${per}${m[5] ? `<div class="src" style="margin-top:4px">Thiết kế / khảo sát: ${m[5]}</div>` : ''}${hasWarn(k) ? `<div class="warnbox">${warnText(k)}</div>` : ''}</div>`;
+  }).join('');
+  const d = document.getElementById('dlg'); if (!d.open) d.showModal();
+}
+
+/* ---------- Render ---------- */
+function render() {
+  const mimic = document.getElementById('mimic');
+  mimic.innerHTML = state.scene === 'boiler' ? boilerSVG() : turbineSVG();
+  const svg = mimic.querySelector('svg');
+  svg.classList.toggle('paused', !state.anim);
+  document.getElementById('side').innerHTML = state.scene === 'boiler' ? sideBoiler() : sideTurbine();
+  document.getElementById('legend').innerHTML = legend();
+  bindZoom(svg);
+  svg.querySelectorAll('.tag').forEach((g) => {
+    g.addEventListener('click', () => openTag(g.dataset.tag));
+    g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openTag(g.dataset.tag); } });
+  });
+}
+/* ---------- Thu phóng: cuộn chuột quanh con trỏ, kéo để di chuyển, nhấp đúp để vừa khung ---------- */
+const views = {};
+const MAX_ZOOM = 8;
+function currentSvg() { return document.querySelector('#mimic svg'); }
+function clampView(v) {
+  const b = v.base;
+  v.w = Math.min(b.w, Math.max(b.w / MAX_ZOOM, v.w)); v.h = v.w * b.h / b.w;
+  v.x = Math.min(b.x + b.w - v.w, Math.max(b.x, v.x)); v.y = Math.min(b.y + b.h - v.h, Math.max(b.y, v.y));
+}
+function applyView(svg) {
+  const v = views[state.scene];
+  svg.setAttribute('viewBox', `${v.x} ${v.y} ${v.w} ${v.h}`);
+  svg.dataset.zoomable = String(v.w < v.base.w - 0.5);
+  document.getElementById('zoomPct').textContent = Math.round(v.base.w / v.w * 100) + '%';
+}
+function toSvg(svg, cx, cy) { const p = svg.createSVGPoint(); p.x = cx; p.y = cy; return p.matrixTransform(svg.getScreenCTM().inverse()); }
+function zoomAt(svg, factor, cx, cy) {
+  const v = views[state.scene];
+  const nw = Math.min(v.base.w, Math.max(v.base.w / MAX_ZOOM, v.w * factor)); const f = nw / v.w;
+  const p = toSvg(svg, cx, cy);
+  v.x = p.x - (p.x - v.x) * f; v.y = p.y - (p.y - v.y) * f; v.w = nw;
+  clampView(v); applyView(svg);
+}
+function zoomCenter(factor) { const svg = currentSvg(); const r = svg.getBoundingClientRect(); zoomAt(svg, factor, r.left + r.width / 2, r.top + r.height / 2); }
+function fitView() { const v = views[state.scene]; Object.assign(v, { x: v.base.x, y: v.base.y, w: v.base.w, h: v.base.h }); applyView(currentSvg()); }
+let suppressClick = false;
+function bindZoom(svg) {
+  if (!views[state.scene]) { const [x, y, w, h] = svg.getAttribute('viewBox').split(' ').map(Number); views[state.scene] = { x, y, w, h, base: { x, y, w, h } }; }
+  applyView(svg);
+  svg.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+    zoomAt(svg, Math.exp(dy * 0.0015), e.clientX, e.clientY);
+  }, { passive: false });
+  let drag = null;
+  svg.addEventListener('pointerdown', (e) => { if (e.button === 0) drag = { x: e.clientX, y: e.clientY, id: e.pointerId, moved: false }; });
+  svg.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!drag.moved) { if (Math.hypot(dx, dy) < 4) return; drag.moved = true; svg.setPointerCapture(drag.id); svg.dataset.panning = 'true'; }
+    const v = views[state.scene]; const k = 1 / svg.getScreenCTM().a;
+    v.x -= dx * k; v.y -= dy * k; clampView(v); applyView(svg);
+    drag.x = e.clientX; drag.y = e.clientY;
+  });
+  const end = () => { if (drag && drag.moved) { suppressClick = true; setTimeout(() => { suppressClick = false; }, 0); } drag = null; svg.dataset.panning = 'false'; };
+  svg.addEventListener('pointerup', end); svg.addEventListener('pointercancel', end);
+  // Kéo xong thì không mở hộp số liệu nằm dưới con trỏ.
+  svg.addEventListener('click', (e) => { if (suppressClick) { e.stopPropagation(); e.preventDefault(); } }, true);
+  svg.addEventListener('dblclick', (e) => { if (!e.target.closest('.tag')) fitView(); });
+}
+document.getElementById('zoomIn').addEventListener('click', () => zoomCenter(1 / 1.25));
+document.getElementById('zoomOut').addEventListener('click', () => zoomCenter(1.25));
+document.getElementById('zoomFit').addEventListener('click', fitView);
+
+document.getElementById('shiftSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  state.shift = b.dataset.shift === 'avg' ? 'avg' : Number(b.dataset.shift);
+  document.querySelectorAll('#shiftSeg button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  render();
+});
+document.getElementById('animBtn').addEventListener('click', (e) => { state.anim = !state.anim; e.currentTarget.setAttribute('aria-pressed', String(state.anim)); render(); });
+document.getElementById('isaBtn').addEventListener('click', (e) => { state.isa = !state.isa; e.currentTarget.setAttribute('aria-pressed', String(state.isa)); document.body.classList.toggle('isa', state.isa); });
+document.getElementById('themeBtn').addEventListener('click', (e) => {
+  const dark = e.currentTarget.getAttribute('aria-pressed') !== 'true';
+  e.currentTarget.setAttribute('aria-pressed', String(dark)); document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+});
+for (const [id, scene] of [['tab-boiler', 'boiler'], ['tab-turbine', 'turbine']]) {
+  document.getElementById(id).addEventListener('click', () => {
+    state.scene = scene;
+    document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.id === id)));
+    render();
+  });
+}
+document.getElementById('dlgClose').addEventListener('click', () => document.getElementById('dlg').close());
+const drawer = document.getElementById('drawer'), scrim = document.getElementById('scrim'), drawerBtn = document.getElementById('drawerBtn');
+function setDrawer(open) {
+  drawer.classList.toggle('open', open); drawer.setAttribute('aria-hidden', String(!open));
+  scrim.hidden = !open; drawerBtn.setAttribute('aria-expanded', String(open));
+  if (open) document.getElementById('drawerClose').focus(); else drawerBtn.focus();
+}
+drawerBtn.addEventListener('click', () => setDrawer(!drawer.classList.contains('open')));
+document.getElementById('drawerClose').addEventListener('click', () => setDrawer(false));
+scrim.addEventListener('click', () => setDrawer(false));
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && drawer.classList.contains('open') && !document.getElementById('dlg').open) setDrawer(false); });
+const fsBtn = document.getElementById('fsBtn');
+if (!document.documentElement.requestFullscreen) fsBtn.hidden = true;
+fsBtn.addEventListener('click', () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); });
+document.addEventListener('fullscreenchange', () => fsBtn.setAttribute('aria-pressed', String(!!document.fullscreenElement)));
+if (matchMedia('(prefers-color-scheme: dark)').matches) document.getElementById('themeBtn').setAttribute('aria-pressed', 'true');
+render();
+</script>
+</body>
+</html>

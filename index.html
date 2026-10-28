@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HMI nhiệt điện EVNGENCO1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Danh mục sơ đồ HMI lò hơi – tua bin: dải tiêu đề navy, thẻ nhà máy nhóm theo trung tâm nhiệt điện. Màu theo docs/design.md. */
+:root {
+  --bg: #F4F6F9; --surface: #FFFFFF; --subtle: #EDF1F5; --fg: #0A1B36; --fg2: #4A5A73; --fg3: #8896A6;
+  --border: #D6DEE8; --border-strong: #B5C1D1; --blue: #005BAA; --blue-hover: #003F7A; --blue-tint: #E6F0FA;
+  --band: #002F6C; --band-fg: #FFFFFF; --band-muted: rgba(255,255,255,.72); --band-line: rgba(255,255,255,.16);
+  --warn: #B07005; --warn-tint: #FDF3E1; --equip: #E3E8EF; --equip-stroke: #8896A6; --flame: #F2A541;
+  --shadow: 0 2px 8px rgba(10,27,54,.06), 0 8px 24px rgba(10,27,54,.04);
+  --shadow-hover: 0 4px 12px rgba(10,27,54,.10), 0 16px 32px rgba(10,27,54,.08);
+  --font: "Be Vietnam Pro", "Segoe UI", "Helvetica Neue", Arial, sans-serif; --mono: "JetBrains Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0B1424; --surface: #111D33; --subtle: #16253F; --fg: #E6ECF5; --fg2: #A9B6C8; --fg3: #7A8AA1;
+  --border: #24344F; --border-strong: #35496A; --blue: #4FA3E3; --blue-hover: #7BBBEB; --blue-tint: #13304F;
+  --band: #001A3D; --band-fg: #FFFFFF; --band-muted: rgba(255,255,255,.72); --band-line: rgba(255,255,255,.16);
+  --warn: #F0B44C; --warn-tint: #3A2B0E; --equip: #1B2A44; --equip-stroke: #5E6E86; --flame: #F2A541;
+  --shadow: 0 2px 8px rgba(0,0,0,.25); --shadow-hover: 0 6px 20px rgba(0,0,0,.35);
+  color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #0B1424; --surface: #111D33; --subtle: #16253F; --fg: #E6ECF5; --fg2: #A9B6C8; --fg3: #7A8AA1;
+  --border: #24344F; --border-strong: #35496A; --blue: #4FA3E3; --blue-hover: #7BBBEB; --blue-tint: #13304F;
+  --band: #001A3D; --band-fg: #FFFFFF; --band-muted: rgba(255,255,255,.72); --band-line: rgba(255,255,255,.16);
+  --warn: #F0B44C; --warn-tint: #3A2B0E; --equip: #1B2A44; --equip-stroke: #5E6E86; --flame: #F2A541;
+  --shadow: 0 2px 8px rgba(0,0,0,.25); --shadow-hover: 0 6px 20px rgba(0,0,0,.35);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 400 16px/1.55 var(--font); -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1200px; margin: 0 auto; padding-inline: 24px; }
+a { color: var(--blue); }
+a:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+.band { background: var(--band); color: var(--band-fg); padding-block: 40px 36px; }
+.eyebrow { font-size: 13px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; }
+.band .eyebrow { color: var(--band-muted); }
+.band h1 { margin: 8px 0 12px; font-size: 40px; line-height: 1.14; letter-spacing: -0.3px; font-weight: 700; text-wrap: balance; max-width: 22ch; }
+.band .lead { margin: 0; font-size: 18px; color: var(--band-muted); max-width: 66ch; }
+.facts { display: flex; flex-wrap: wrap; gap: 12px 32px; margin: 28px 0 0; padding: 20px 0 0; border-top: 1px solid var(--band-line); list-style: none; }
+.facts li { display: grid; gap: 2px; }
+.facts b { font-size: 28px; line-height: 1.15; font-weight: 700; letter-spacing: -0.2px; font-variant-numeric: tabular-nums; }
+.facts span { font-size: 13px; color: var(--band-muted); }
+
+main { padding-block: 32px 48px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 36px 16px; align-items: stretch; }
+.site { display: flex; flex-direction: column; min-width: 0; }
+.span1 { grid-column: span 1; } .span2 { grid-column: span 2; } .span3 { grid-column: span 3; }
+.site h2 { margin: 0 0 4px; font-size: 24px; line-height: 1.3; font-weight: 600; letter-spacing: -0.1px; }
+.site > p { margin: 0 0 16px; font-size: 14px; color: var(--fg2); max-width: 70ch; }
+.grid { flex: 1; display: grid; grid-template-columns: repeat(var(--cols, 1), minmax(0, 1fr)); gap: 16px; }
+.span2 .grid { --cols: 2; } .span3 .grid { --cols: 3; }
+
+.card { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr auto; gap: 14px; padding: 20px 20px 18px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; box-shadow: var(--shadow); color: inherit; text-decoration: none; min-width: 0; transition: box-shadow .2s ease, border-color .2s ease; }
+.card:hover { box-shadow: var(--shadow-hover); border-color: var(--border-strong); }
+.card:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.card-h { display: grid; grid-template-columns: 1fr 56px; gap: 12px; align-items: start; }
+.card h3 { margin: 0; font-size: 20px; line-height: 1.35; font-weight: 600; }
+.unit { display: block; margin-top: 2px; font-size: 14px; color: var(--fg2); }
+.mw { display: block; margin-top: 6px; font-size: 28px; line-height: 1.15; font-weight: 700; letter-spacing: -0.2px; font-variant-numeric: tabular-nums; }
+.mw small { font-size: 14px; font-weight: 500; color: var(--fg2); letter-spacing: 0; }
+.shape { width: 56px; height: 56px; }
+.shape .body { fill: var(--equip); stroke: var(--equip-stroke); stroke-width: 1.4; stroke-linejoin: round; }
+.shape .fl { fill: var(--flame); }
+dl { margin: 0; display: grid; grid-template-columns: 78px 1fr; gap: 6px 12px; font-size: 14px; line-height: 1.5; }
+dt { color: var(--fg3); }
+dd { margin: 0; min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.chip { font-size: 12px; font-weight: 500; letter-spacing: .2px; padding: 2px 8px; border-radius: 4px; background: var(--subtle); color: var(--fg2); }
+.chip.warn { background: var(--warn-tint); color: var(--warn); }
+.open { display: flex; justify-content: space-between; align-items: center; padding-top: 12px; border-top: 1px solid var(--border); font-size: 14px; font-weight: 600; color: var(--blue); }
+.open span { white-space: nowrap; }
+.open code { font: 500 12px var(--mono); color: var(--fg3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; margin-right: 12px; }
+.card:hover .open span { color: var(--blue-hover); }
+
+.how .grid { --cols: 2; }
+.how .grid > section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; min-width: 0; }
+.how .grid h2 { margin: 0 0 10px; font-size: 16px; line-height: 1.4; font-weight: 600; }
+.how ul { margin: 0; padding-left: 18px; font-size: 14px; color: var(--fg2); display: grid; gap: 6px; }
+.how b { color: var(--fg); font-weight: 600; }
+footer { padding-block: 0 40px; font-size: 13px; color: var(--fg3); }
+
+@media (max-width: 1040px) {
+  main { grid-template-columns: 1fr; }
+  .site, .span1, .span2, .span3 { grid-column: 1 / -1; }
+  .span3 .grid { --cols: 2; }
+}
+@media (max-width: 640px) {
+  .wrap { padding-inline: 16px; }
+  .band { padding-block: 28px; }
+  .band h1 { font-size: 30px; }
+  .band .lead { font-size: 16px; }
+  .site, .span1, .span2, .span3 { grid-column: 1 / -1; }
+  .site .grid { --cols: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .card { transition: none; } }
+</style>
+</head>
+<body>
+<header class="band">
+  <div class="wrap">
+    <div class="eyebrow">PMS · Hiệu suất nhiệt · Bản nháp để rà soát</div>
+    <h1>Sơ đồ HMI lò hơi và tua bin</h1>
+    <p class="lead">Mỗi sơ đồ dựng riêng cho một tổ máy theo báo cáo khảo sát hiện trạng 2024, bản vẽ nhà chế tạo và sơ đồ cân bằng nhiệt thiết kế. Ô số liệu cho biết giá trị lấy từ đâu, kèm số thiết kế để so sánh. Những số bất thường được đánh dấu ⚠ để nhà máy xác nhận.</p>
+    <ul class="facts">
+      <li><b>7</b><span>sơ đồ HMI</span></li>
+      <li><b>4</b><span>trung tâm nhiệt điện</span></li>
+      <li><b>300–688</b><span>MW mỗi tổ máy</span></li>
+      <li><b>2</b><span>màn mỗi sơ đồ: lò hơi, tua bin</span></li>
+    </ul>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="site span1" aria-labelledby="s-ns">
+    <h2 id="s-ns">Nghi Sơn</h2>
+    <p>Lò W-flame đốt than antraxit.</p>
+    <div class="grid">
+      <a class="card" href="nghi-son-1-boiler-turbine-hmi.html">
+        <div class="card-h"><div><h3>Nghi Sơn 1</h3><span class="unit">Tổ máy S1</span><span class="mw">300 <small>MW</small></span></div>
+          <svg class="shape" viewBox="0 0 60 60" aria-hidden="true"><path class="body" d="M18 6H50V32H40V14L28 20V30L34 34V46L24 56H20L10 46V34L18 30Z"/><path class="fl" d="M14 36Q16 42 19 46Q16 42 15 36Z"/></svg></div>
+        <div>
+          <dl><dt>Lò hơi</dt><dd>Foster Wheeler, W-flame, đuôi lò chia hai nhánh</dd><dt>Tua bin</dt><dd>Fuji Electric 3 thân, 7 cửa trích</dd><dt>Số liệu</dt><dd>Workbook NS_S1: 3 ca và trung bình</dd></dl>
+          <div class="chips"><span class="chip">W-flame</span><span class="chip">Bao hơi</span><span class="chip warn">⚠ Đơn vị lưu lượng gió</span></div>
+        </div>
+        <div class="open"><code>nghi-son-1-boiler-turbine-hmi.html</code><span>Mở sơ đồ →</span></div>
+      </a>
+    </div>
+  </section>
+
+  <section class="site span2" aria-labelledby="s-ub">
+    <h2 id="s-ub">Uông Bí</h2>
+    <p>S7 dùng lò chữ Π của Nga có bộ sấy kiểu ống, S8 dùng lò W-flame B&amp;W.</p>
+    <div class="grid">
+      <a class="card" href="uong-bi-s7-boiler-turbine-hmi.html">
+        <div class="card-h"><div><h3>Uông Bí mở rộng</h3><span class="unit">Tổ máy S7</span><span class="mw">300 <small>MW</small></span></div>
+          <svg class="shape" viewBox="0 0 60 60" aria-hidden="true"><path class="body" d="M10 6H50V54H40V14L28 18V44L20 54H18L10 44Z"/><path class="fl" d="M11 38Q16 37 22 38Q16 39 11 38Z"/></svg></div>
+        <div>
+          <dl><dt>Lò hơi</dt><dd>Еп-920-17,6-543 AT, chữ Π, nghiền bi gián tiếp, sấy không khí kiểu ống</dd><dt>Tua bin</dt><dd>K-300-170-1P, 6 cửa trích và bộ làm mát hơi OP</dd><dt>Số liệu</dt><dd>Thiết kế 100 % RO và khảo sát 2024</dd></dl>
+          <div class="chips"><span class="chip">Chữ Π</span><span class="chip">Bao hơi</span><span class="chip">Tái nhiệt hơi–hơi</span></div>
+        </div>
+        <div class="open"><code>uong-bi-s7-boiler-turbine-hmi.html</code><span>Mở sơ đồ →</span></div>
+      </a>
+      <a class="card" href="uong-bi-s8-boiler-turbine-hmi.html">
+        <div class="card-h"><div><h3>Uông Bí mở rộng 2</h3><span class="unit">Tổ máy S8</span><span class="mw">330 <small>MW</small></span></div>
+          <svg class="shape" viewBox="0 0 60 60" aria-hidden="true"><path class="body" d="M18 6H50V32H40V14L28 20V30L34 34V46L24 56H20L10 46V34L18 30Z"/><path class="fl" d="M14 36Q16 42 19 46Q16 42 15 36Z"/></svg></div>
+        <div>
+          <dl><dt>Lò hơi</dt><dd>BWBC công nghệ B&amp;W, W-flame, đuôi lò chia hai nhánh</dd><dt>Tua bin</dt><dd>N330-17.75/540/540 Beijing Beizhong, 7 cửa trích</dd><dt>Số liệu</dt><dd>Workbook UBS8: 3 ca và trung bình</dd></dl>
+          <div class="chips"><span class="chip">W-flame</span><span class="chip">Bao hơi</span><span class="chip warn">⚠ Áp suất bình ngưng</span></div>
+        </div>
+        <div class="open"><code>uong-bi-s8-boiler-turbine-hmi.html</code><span>Mở sơ đồ →</span></div>
+      </a>
+    </div>
+  </section>
+
+  <section class="site span3" aria-labelledby="s-dh">
+    <h2 id="s-dh">Duyên Hải</h2>
+    <p>Ba nhà máy cùng trung tâm, ba kiểu lò: W-flame, chữ Π đốt đối diện, trực lưu siêu tới hạn.</p>
+    <div class="grid">
+      <a class="card" href="duyen-hai-1-boiler-turbine-hmi.html">
+        <div class="card-h"><div><h3>Duyên Hải 1</h3><span class="unit">Tổ máy S1</span><span class="mw">622,5 <small>MW</small></span></div>
+          <svg class="shape" viewBox="0 0 60 60" aria-hidden="true"><path class="body" d="M18 6H50V32H40V14L28 20V30L34 34V46L24 56H20L10 46V34L18 30Z"/><path class="fl" d="M14 36Q16 42 19 46Q16 42 15 36Z"/></svg></div>
+        <div>
+          <dl><dt>Lò hơi</dt><dd>Dongfang, W-flame, đuôi lò chia hai nhánh, có SCR</dd><dt>Tua bin</dt><dd>Dongfang, 8 cửa trích, tua bin bơm cấp, 2 thân LP</dd><dt>Số liệu</dt><dd>Khảo sát 3 ca và thiết kế RO</dd></dl>
+          <div class="chips"><span class="chip">W-flame</span><span class="chip">Bao hơi</span><span class="chip">SCR</span></div>
+        </div>
+        <div class="open"><code>duyen-hai-1-boiler-turbine-hmi.html</code><span>Mở sơ đồ →</span></div>
+      </a>
+      <a class="card" href="duyen-hai-3-boiler-turbine-hmi.html">
+        <div class="card-h"><div><h3>Duyên Hải 3</h3><span class="unit">Tổ máy S1</span><span class="mw">622,5 <small>MW</small></span></div>
+          <svg class="shape" viewBox="0 0 60 60" aria-hidden="true"><path class="body" d="M10 6H50V34H40V14L30 18V44L22 54H18L10 44Z"/><path class="fl" d="M11 30Q16 29 20 30Q16 31 11 30Z"/><path class="fl" d="M29 36Q24 35 20 36Q24 37 29 36Z"/></svg></div>
+        <div>
+          <dl><dt>Lò hơi</dt><dd>Dongfang DG2028/17.5-Π, 30 vòi xoáy đốt đối diện, 6 máy nghiền chén</dd><dt>Tua bin</dt><dd>Dongfang N622, 8 cửa trích, 2 tua bin bơm cấp</dd><dt>Số liệu</dt><dd>Bộ test DH3_S1: 3 ca và trung bình</dd></dl>
+          <div class="chips"><span class="chip">Chữ Π</span><span class="chip">Bao hơi</span><span class="chip">SCR</span></div>
+        </div>
+        <div class="open"><code>duyen-hai-3-boiler-turbine-hmi.html</code><span>Mở sơ đồ →</span></div>
+      </a>
+      <a class="card" href="duyen-hai-3-mo-rong-boiler-turbine-hmi.html">
+        <div class="card-h"><div><h3>Duyên Hải 3 mở rộng</h3><span class="unit">Tổ máy S3</span><span class="mw">688 <small>MW</small></span></div>
+          <svg class="shape" viewBox="0 0 60 60" aria-hidden="true"><path class="body" d="M10 6H50V34H40V14L30 18V44L22 54H18L10 44Z"/><path class="fl" d="M11 30Q16 29 20 30Q16 31 11 30Z"/><path class="fl" d="M29 36Q24 35 20 36Q24 37 29 36Z"/></svg></div>
+        <div>
+          <dl><dt>Lò hơi</dt><dd>B&amp;W HV-XCL siêu tới hạn, trực lưu, tường xoắn ốc, 30 vòi đốt đối diện</dd><dt>Tua bin</dt><dd>Toshiba, 8 cửa trích, 1 thân LP, bơm cấp chạy điện</dd><dt>Số liệu</dt><dd>Workbook DH3MR: 3 ca và trung bình</dd></dl>
+          <div class="chips"><span class="chip">Siêu tới hạn</span><span class="chip">Không bao hơi</span><span class="chip warn">⚠ Nhiệt độ GNC3</span></div>
+        </div>
+        <div class="open"><code>duyen-hai-3-mo-rong-boiler-turbine-hmi.html</code><span>Mở sơ đồ →</span></div>
+      </a>
+    </div>
+  </section>
+
+  <section class="site span1" aria-labelledby="s-qn">
+    <h2 id="s-qn">Quảng Ninh</h2>
+    <p>4 tổ máy cùng thiết kế, chung một sơ đồ.</p>
+    <div class="grid">
+      <a class="card" href="quang-ninh-boiler-turbine-hmi.html">
+        <div class="card-h"><div><h3>Quảng Ninh 1 và 2</h3><span class="unit">Tổ máy 2 (QN1) và tổ máy 3 (QN2)</span><span class="mw">300 <small>MW mỗi tổ</small></span></div>
+          <svg class="shape" viewBox="0 0 60 60" aria-hidden="true"><path class="body" d="M18 6H50V32H40V14L28 20V30L34 34V46L24 56H20L10 46V34L18 30Z"/><path class="fl" d="M14 36Q16 42 19 46Q16 42 15 36Z"/></svg></div>
+        <div>
+          <dl><dt>Lò hơi</dt><dd>Alstom SG-995/17.5-M728, W-flame, 3 bơm tuần hoàn, tái nhiệt kiểu tường</dd><dt>Tua bin</dt><dd>300 MW 3 thân, 3 GNC, khử khí và 4 GNH</dd><dt>Số liệu</dt><dd>Khảo sát 2024: 2 tổ máy × 3 ca</dd></dl>
+          <div class="chips"><span class="chip">W-flame</span><span class="chip">Bao hơi</span><span class="chip warn">⚠ Số liệu tổ 3 ca 1</span></div>
+        </div>
+        <div class="open"><code>quang-ninh-boiler-turbine-hmi.html</code><span>Mở sơ đồ →</span></div>
+      </a>
+    </div>
+  </section>
+
+  <section class="site span2 how" aria-labelledby="s-how">
+    <h2 id="s-how">Cách dùng</h2>
+    <p>Mỗi sơ đồ có hai màn và cùng một bộ điều khiển.</p>
+    <div class="grid">
+    <section>
+      <h2>Xem sơ đồ</h2>
+      <ul>
+        <li>Chuyển giữa màn <b>Lò hơi</b> và <b>Tua bin</b> bằng hai tab ở góc trái.</li>
+        <li>Chọn <b>ca</b> hoặc <b>bộ số liệu</b> (thiết kế, khảo sát, tổ máy) trên thanh điều khiển; mọi ô số liệu đổi theo.</li>
+        <li><b>Cuộn chuột</b> để phóng to quanh con trỏ, <b>kéo</b> để di chuyển, <b>nhấp đúp</b> để vừa khung.</li>
+        <li><b>Thông tin &amp; thiết kế</b> mở bảng hiệu suất lò, tua bin, thông số thiết kế và danh sách điểm cần xác nhận.</li>
+        <li><b>ISA-101</b> chuyển dòng chảy về màu trung tính, chỉ giữ màu cho trạng thái bất thường.</li>
+      </ul>
+    </section>
+    <section>
+      <h2>Đọc ô số liệu</h2>
+      <ul>
+        <li><b>Bấm vào ô</b> để xem nguồn (ô Excel hoặc dòng trong bảng khảo sát), giá trị của từng ca và số thiết kế.</li>
+        <li>Ô có dấu <b>⚠</b> là số bất thường cần nhà máy xác nhận; lời giải thích nằm trong hộp chi tiết.</li>
+        <li>Ô nét đứt là đại lượng không có số đo; chữ nghiêng là số nhập cố định hoặc lấy theo tín hiệu khác.</li>
+        <li>Các sơ đồ là bản nháp, chưa đưa vào phần mềm PMS.</li>
+      </ul>
+    </section>
+    </div>
+  </section>
+</main>
+
+<footer class="wrap">Cập nhật 28/10/2026 · Nguồn: báo cáo khảo sát hiện trạng các NMNĐ (PECC3, 2024), workbook hiệu suất nhiệt 20/06/2025, bản vẽ và sơ đồ cân bằng nhiệt của nhà chế tạo.</footer>
+</body>
+</html>
